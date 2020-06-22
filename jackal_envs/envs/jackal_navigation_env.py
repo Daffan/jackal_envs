@@ -3,19 +3,42 @@ import rospy
 import roslaunch
 import time
 import numpy as np
+import os
 
 from gym import utils, spaces
 from gym_gazebo.envs import gazebo_env
 from geometry_msgs.msg import Twist
 from std_srvs.srv import Empty
 
+import actionlib
 from sensor_msgs.msg import LaserScan
-
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from gym.utils import seeding
 
-launchfile = ps.path.join(os.path.dirname(__file__), "assets", "launch", 'jackal_world.launch') # remain to copy to this folder later
+from geometry_msgs.msg import Quaternion
+from tf.transformations import quaternion_from_euler, euler_from_quaternion
+from math import radians, degrees
 
-class GazeboCircuitTurtlebotLidarEnv(gazebo_env.GazeboEnv):
+base_path = '/home/zifan/'
+launchfile = os.path.join(os.getcwd(), 'assets', 'launch', 'jackal_world_navigation.launch') # remain to copy to this folder later
+print(launchfile)
+def create_nav_goal(x, y, yaw):
+    """Create a MoveBaseGoal with x, y position and yaw rotation (in degrees).
+Returns a MoveBaseGoal"""
+    mb_goal = MoveBaseGoal()
+    mb_goal.target_pose.header.frame_id = 'odom' # Note: the frame_id must be map
+    mb_goal.target_pose.pose.position.x = x
+    mb_goal.target_pose.pose.position.y = y
+    mb_goal.target_pose.pose.position.z = 0.0 # z must be 0.0 (no height in the map)
+
+    # Orientation of the robot is expressed in the yaw value of euler angles
+    angle = radians(yaw) # angles are expressed in radians
+    quat = quaternion_from_euler(0.0, 0.0, angle) # roll, pitch, yaw
+    mb_goal.target_pose.pose.orientation = Quaternion(*quat.tolist())
+
+    return mb_goal
+
+class GazeboJackalNavigationEnv(gazebo_env.GazeboEnv):
 
     def __init__(self):
         # Launch the simulation with the given launchfile name
@@ -29,6 +52,14 @@ class GazeboCircuitTurtlebotLidarEnv(gazebo_env.GazeboEnv):
         self.reward_range = (-np.inf, np.inf)
 
         self._seed()
+        try:
+            self.goal_setting = actionlib.SimpleActionClient('/move_base', MoveBaseAction)
+            self.goal_setting.wait_for_server()
+            nav_goal = create_nav_goal(8, 6, 0)
+            self.goal_setting.send_goal(nav_goal)
+        except:
+            print ("/move_base service failed to send the goal")
+        self.reset()
 
     def discretize_observation(self,data,new_ranges):
         discretized_ranges = []
@@ -59,26 +90,10 @@ class GazeboCircuitTurtlebotLidarEnv(gazebo_env.GazeboEnv):
         except (rospy.ServiceException) as e:
             print ("/gazebo/unpause_physics service call failed")
 
-        if action == 0: #FORWARD
-            vel_cmd = Twist()
-            vel_cmd.linear.x = 0.3
-            vel_cmd.angular.z = 0.0
-            self.vel_pub.publish(vel_cmd)
-        elif action == 1: #LEFT
-            vel_cmd = Twist()
-            vel_cmd.linear.x = 0.05
-            vel_cmd.angular.z = 0.3
-            self.vel_pub.publish(vel_cmd)
-        elif action == 2: #RIGHT
-            vel_cmd = Twist()
-            vel_cmd.linear.x = 0.05
-            vel_cmd.angular.z = -0.3
-            self.vel_pub.publish(vel_cmd)
-
         data = None
         while data is None:
             try:
-                data = rospy.wait_for_message('/scan', LaserScan, timeout=5)
+                data = rospy.wait_for_message('front/scan', LaserScan, timeout=5)
             except:
                 pass
 
@@ -123,7 +138,7 @@ class GazeboCircuitTurtlebotLidarEnv(gazebo_env.GazeboEnv):
         data = None
         while data is None:
             try:
-                data = rospy.wait_for_message('/scan', LaserScan, timeout=5)
+                data = rospy.wait_for_message('front/scan', LaserScan, timeout=5)
             except:
                 pass
 
@@ -137,3 +152,11 @@ class GazeboCircuitTurtlebotLidarEnv(gazebo_env.GazeboEnv):
         state = self.discretize_observation(data,5)
 
         return state
+
+if __name__ == '__main__':
+    env = GazeboJackalNavigationEnv()
+    env.reset()
+    print(env.step(0))
+    env.unpause()
+    time.sleep(30)
+    env.close()
