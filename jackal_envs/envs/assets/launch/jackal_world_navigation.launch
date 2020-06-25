@@ -1,8 +1,9 @@
 <launch>
   <arg name="use_sim_time" default="true" />
-  <arg name="gui" default="false" />
+  <arg name="gui" default="true" />
   <arg name="headless" default="false" />
-  <arg name="world_name" default="$(find jackal_gazebo)/worlds/jackal_race.world" />
+  <!-- change the world path to where the custom world would be -->
+  <arg name="world_name" default="$(env GAZEBO_ASSETS_PATH)/worlds/jackal_race.world" />
 
   <!-- Short-term hack to support the original front_laser:=true argument for spawning
        the simulator. This will be removed in favour of using the config:=x arg instead. -->
@@ -25,7 +26,7 @@
   </include>
 
   <!-- Load Jackal's description, controllers, and teleop nodes. -->
-  <include file="$(find jackal_description)/launch/description.launch">
+  <include file="$(env GAZEBO_ASSETS_PATH)/launch/description.launch">
     <arg name="config" value="$(arg config)" />
   </include>
   <include file="$(find jackal_control)/launch/control.launch" />
@@ -37,6 +38,9 @@
   <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model"
 	      args="-urdf -model jackal -param robot_description -x 0 -y 0 -z 1.0" />
 
+  <!-- Load navigation stack -->
+  <!-- Seems no need to change the path now -->
+  <!-- because we don't need to customize the navigation stack -->
   <include file="$(find jackal_navigation)/launch/odom_navigation_demo.launch" />
 
 </launch>

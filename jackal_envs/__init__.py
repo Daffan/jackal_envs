@@ -1,6 +1,6 @@
 from gym.envs.registration import register
 
 register(
-    id='foo-v0',
-    entry_point='gym_foo.envs:FooEnv',
+    id='jackal_navigation-v0',
+    entry_point='jackal_envs.envs:GazeboJackalNavigationEnv',
 )

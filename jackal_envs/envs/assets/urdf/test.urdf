@@ -1,0 +1,14 @@
+<robot>
+  <!-- This file is an example that can be included from jackal.urdf.xacro
+       by setting the JACKAL_URDF_EXTRAS environment variable to the full
+       path of this file. -->
+       
+  <sick_lms1xx_mount prefix="rear" topic="rear/scan"/>
+
+  <joint name="rear_laser_mount_joint" type="fixed">
+    <origin xyz="0 0 0.002" rpy="0 0 3.141" />>
+    <parent link="rear_mount" />
+    <child link="rear_laser_mount" />
+  </joint>
+
+</robot>

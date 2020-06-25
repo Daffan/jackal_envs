@@ -1,1 +1,1 @@
-from gym_foo.envs.foo_env import FooEnv
+from jackal_envs.envs.jackal_navigation_env import GazeboJackalNavigationEnv
