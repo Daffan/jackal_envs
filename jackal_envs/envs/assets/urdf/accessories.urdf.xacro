@@ -21,7 +21,6 @@
     <xacro:if value="$(optenv JACKAL_LASER_VLP 0)">
       <xacro:include filename="$(env GAZEBO_ASSETS_PATH)/urdf/accessories/VLP-16.urdf.xacro" />
       <VLP-16 parent="$(optenv JACKAL_LASER_MOUNT front)_mount"
-              topic="$(optenv JACKAL_LASER_TOPIC front/scan)"
               name="front_laser">
         <origin xyz="0 0 0" rpy="0 0 0" />
       </VLP-16>

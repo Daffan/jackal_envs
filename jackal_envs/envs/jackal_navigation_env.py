@@ -16,10 +16,13 @@ from sensor_msgs.msg import LaserScan
 from gym.utils import seeding
 
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
-from geometry_msgs.msg import Quaternion, PoseStamped
+from geometry_msgs.msg import Quaternion, PoseStamped, Pose, Quaternion
+from gazebo_msgs.msg import ModelState
+from gazebo_msgs.srv import SetModelState
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
 from rosgraph_msgs.msg import Clock
 from math import radians, degrees
+import dynamic_reconfigure.client
 
 def create_nav_goal(x, y, yaw):
     """Create a MoveBaseGoal with x, y position and yaw rotation (in degrees).
@@ -46,23 +49,35 @@ class GazeboJackalNavigationEnv(gym.Env):
         # Should have the system enviroment source to test_pkg
         BASE_PATH = os.path.dirname(__file__)
         self.gazebo_process = subprocess.Popen(['roslaunch', os.path.join(BASE_PATH, 'assets', 'launch', 'jackal_world_navigation.launch')])
+
         time.sleep(5)
         rospy.set_param('/use_sim_time', True)
         rospy.init_node('gym', anonymous=True)
 
         self.unpause = rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
         self.pause = rospy.ServiceProxy('/gazebo/pause_physics', Empty)
-        self.reset_proxy = rospy.ServiceProxy('/gazebo/reset_simulation', Empty)
+        self.reset_proxy = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
         self.nav_as = actionlib.SimpleActionClient('/move_base', MoveBaseAction)
+        self.client = dynamic_reconfigure.client.Client('move_base/TrajectoryPlannerROS')
 
         self.action_space = spaces.Discrete(3) #F,L,R
         self.reward_range = (-np.inf, np.inf)
 
+        self.init_model_state = ModelState()
+        self.init_model_state.model_name = 'jackal'
+        self.init_model_state.pose.position.x = 0
+        self.init_model_state.pose.position.y = 0
+        self.init_model_state.pose.position.z = 0
+        q = quaternion_from_euler(0, 0, 0)
+        self.init_model_state.pose.orientation = Quaternion(*q)
+        self.init_model_state.reference_frame = "world";
+
         self._seed()
 
         self.nav_as.wait_for_server()
-        self.nav_as.send_goal(create_nav_goal(6, 2, 0))
+        self.nav_as.send_goal(create_nav_goal(6, 6, 0))
         print("Published globe goal position!")
+
 
         rospy.wait_for_service('/gazebo/pause_physics')
         try:
@@ -70,9 +85,6 @@ class GazeboJackalNavigationEnv(gym.Env):
             self.pause()
         except (rospy.ServiceException) as e:
             print ("/gazebo/pause_physics service call failed")
-        print("Paused the world ready to start")
-
-        # self.reset()
 
     # Just use this simulation for now
     def discretize_observation(self,data,new_ranges):
@@ -97,6 +109,21 @@ class GazeboJackalNavigationEnv(gym.Env):
         return [seed]
 
     def step(self, action):
+        params = rospy.get_param('/move_base/TrajectoryPlannerROS/max_vel_x')
+        if action == 0:
+            params = params
+        elif action == 1:
+            params = params + 0.1
+            config = self.client.update_configuration({'max_vel_x': params})
+            print context_type
+            rospy.set_param('/move_base/TrajectoryPlannerROS/max_vel_x', params)
+        elif action == 2:
+            params = params - 0.1
+            config = self.client.update_configuration({'max_vel_x': params})
+            print context_type
+            rospy.set_param('/move_base/TrajectoryPlannerROS/max_vel_x', params)
+        else:
+            raise Exception('Action does not exist')
 
         # Unpause the world
         rospy.wait_for_service('/gazebo/unpause_physics')
@@ -140,12 +167,12 @@ class GazeboJackalNavigationEnv(gym.Env):
     def reset(self):
 
         # Resets the state of the environment and returns an initial observation.
-        rospy.wait_for_service('/gazebo/reset_simulation')
+        rospy.wait_for_service("/gazebo/set_model_state")
         try:
             #reset_proxy.call()
-            self.reset_proxy()
+            self.reset_proxy(self.init_model_state)
         except (rospy.ServiceException) as e:
-            print ("/gazebo/reset_simulation service call failed")
+            print ("/gazebo/set_model_state service call failed")
 
         # Unpause simulation to make observation
         rospy.wait_for_service('/gazebo/unpause_physics')
