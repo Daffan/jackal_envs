@@ -1,16 +1,18 @@
 from jackal_envs.envs import GazeboJackalNavigationEnv
-env = GazeboJackalNavigationEnv()
 import time
 
 
 env = GazeboJackalNavigationEnv()
 
-for _ in range(100):
-    env.reset()
-    time.sleep(1)
-# done = False
-# while not done:
-#     obs, rew, done, _ = env.step(0)
+done = False
+count = 0
+while not done:
+    count += 1
+    obs, rew, done, _ = env.step(0)
+    print('current step %d' %(count))
+    if count > 40:
+        break
 
+print(env.gazebo_sim.get_model_state())
 
 env.close()

@@ -1,5 +1,6 @@
 import gym
 import rospy
+import rospkg
 import roslaunch
 import time
 import numpy as np
@@ -7,38 +8,12 @@ import os
 import subprocess
 
 from gym import utils, spaces
-from jackal_envs.envs import gazebo_env
-from geometry_msgs.msg import Twist
 from std_srvs.srv import Empty
-
 import actionlib
-from sensor_msgs.msg import LaserScan
 from gym.utils import seeding
 
-from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
-from geometry_msgs.msg import Quaternion, PoseStamped, Pose, Quaternion
-from gazebo_msgs.msg import ModelState
-from gazebo_msgs.srv import SetModelState
-from tf.transformations import quaternion_from_euler, euler_from_quaternion
-from rosgraph_msgs.msg import Clock
-from math import radians, degrees
-import dynamic_reconfigure.client
-
-def create_nav_goal(x, y, yaw):
-    """Create a MoveBaseGoal with x, y position and yaw rotation (in degrees).
-Returns a MoveBaseGoal"""
-    mb_goal = MoveBaseGoal()
-    mb_goal.target_pose.header.frame_id = 'odom' # Note: the frame_id must be map
-    mb_goal.target_pose.pose.position.x = x
-    mb_goal.target_pose.pose.position.y = y
-    mb_goal.target_pose.pose.position.z = 0.0 # z must be 0.0 (no height in the map)
-
-    # Orientation of the robot is expressed in the yaw value of euler angles
-    angle = radians(yaw) # angles are expressed in radians
-    quat = quaternion_from_euler(0.0, 0.0, angle) # roll, pitch, yaw
-    mb_goal.target_pose.pose.orientation = Quaternion(*quat.tolist())
-
-    return mb_goal
+from gazebo_simulation import GazeboSimulation
+from navigation_stack import  NavigationStack
 
 class GazeboJackalNavigationEnv(gym.Env):
 
@@ -47,66 +22,47 @@ class GazeboJackalNavigationEnv(gym.Env):
 
         # Launch gazebo and navigation demo
         # Should have the system enviroment source to test_pkg
-        BASE_PATH = os.path.dirname(__file__)
-        self.gazebo_process = subprocess.Popen(['roslaunch', os.path.join(BASE_PATH, 'assets', 'launch', 'jackal_world_navigation.launch')])
+        rospack = rospkg.RosPack()
+        BASE_PATH = rospack.get_path('jackal_helper')
+        self.gazebo_process = subprocess.Popen(['roslaunch', os.path.join(BASE_PATH, 'launch', 'jackal_world_navigation.launch')])
 
         time.sleep(5)
         rospy.set_param('/use_sim_time', True)
         rospy.init_node('gym', anonymous=True)
 
-        self.unpause = rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
-        self.pause = rospy.ServiceProxy('/gazebo/pause_physics', Empty)
-        self.reset_proxy = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
-        self.nav_as = actionlib.SimpleActionClient('/move_base', MoveBaseAction)
-        self.client = dynamic_reconfigure.client.Client('move_base/TrajectoryPlannerROS')
+        self.gazebo_sim = GazeboSimulation()
+        self.navi_stack = NavigationStack()
 
         self.action_space = spaces.Discrete(3) #F,L,R
         self.reward_range = (-np.inf, np.inf)
 
-        self.init_model_state = ModelState()
-        self.init_model_state.model_name = 'jackal'
-        self.init_model_state.pose.position.x = 0
-        self.init_model_state.pose.position.y = 0
-        self.init_model_state.pose.position.z = 0
-        q = quaternion_from_euler(0, 0, 0)
-        self.init_model_state.pose.orientation = Quaternion(*q)
-        self.init_model_state.reference_frame = "world";
-
         self._seed()
 
-        self.nav_as.wait_for_server()
-        self.nav_as.send_goal(create_nav_goal(6, 6, 0))
-        print("Published globe goal position!")
-
-
-        rospy.wait_for_service('/gazebo/pause_physics')
-        try:
-            #resp_pause = pause.call()
-            self.pause()
-        except (rospy.ServiceException) as e:
-            print ("/gazebo/pause_physics service call failed")
-
-    # Just use this simulation for now
-    def discretize_observation(self,data,new_ranges):
-        discretized_ranges = []
-        min_range = 0.2
-        done = False
-        mod = len(data.ranges)/new_ranges
-        for i, item in enumerate(data.ranges):
-            if (i%mod==0):
-                if data.ranges[i] == float ('Inf'):
-                    discretized_ranges.append(6)
-                elif np.isnan(data.ranges[i]):
-                    discretized_ranges.append(0)
-                else:
-                    discretized_ranges.append(int(data.ranges[i]))
-            if (min_range > data.ranges[i] > 0):
-                done = True
-        return discretized_ranges,done
+        self.navi_stack.set_global_goal()
+        self.gazebo_sim.pause()
 
     def _seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
+
+    def _observation_builder(self, laser_scan, local_goal):
+        '''
+        Observation is the laser scan plus local goal. Episode ends when the
+        between gobal goal and robot positon is less than 0.4m. Reward is set
+        to -1 for each step
+        '''
+        scan_ranges = np.array(laser_scan.ranges)[1:-1]
+        scan_ranges[scan_ranges == np.inf] = 30
+        local_goal_position = np.array([local_goal.position.x, local_goal.position.y])
+        state = np.concatenate([scan_ranges, local_goal_position])
+
+        distance = np.sqrt(np.sum((local_goal_position)**2))
+        if distance < 0.4:
+            done = True
+        else:
+            done = False
+
+        return state, -1, done, {}
 
     def step(self, action):
         params = rospy.get_param('/move_base/TrajectoryPlannerROS/max_vel_x')
@@ -114,90 +70,43 @@ class GazeboJackalNavigationEnv(gym.Env):
             params = params
         elif action == 1:
             params = params + 0.1
-            config = self.client.update_configuration({'max_vel_x': params})
-            print context_type
-            rospy.set_param('/move_base/TrajectoryPlannerROS/max_vel_x', params)
+            self.navi_stack.set_max_vel_x(params)
         elif action == 2:
             params = params - 0.1
-            config = self.client.update_configuration({'max_vel_x': params})
-            print context_type
-            rospy.set_param('/move_base/TrajectoryPlannerROS/max_vel_x', params)
+            self.navi_stack.set_max_vel_x(params)
         else:
             raise Exception('Action does not exist')
 
         # Unpause the world
-        rospy.wait_for_service('/gazebo/unpause_physics')
-        try:
-            self.unpause()
-        except (rospy.ServiceException) as e:
-            print ("/gazebo/unpause_physics service call failed")
-
-        # Taking the action here (to be added)
+        self.gazebo_sim.unpause()
 
         # Sleep for 5s (a hyperparameter that can be tuned)
-        rospy.sleep(5)
+        rospy.sleep(1)
 
         # Collect the laser scan data
-        # Local goal need to be added later
-        data = None
-        while data is None:
-            try:
-                data = rospy.wait_for_message('front/scan', LaserScan, timeout=5)
-            except:
-                pass
+        laser_scan = self.gazebo_sim.get_laser_scan()
+        local_goal = self.navi_stack.get_local_goal()
 
         # Pause the simulation world
-        rospy.wait_for_service('/gazebo/pause_physics')
-        try:
-            #resp_pause = pause.call()
-            self.pause()
-        except (rospy.ServiceException) as e:
-            print ("/gazebo/pause_physics service call failed")
+        self.gazebo_sim.pause()
 
-        state, done = self.discretize_observation(data,5)
-
-        # collide with the obstacle or timeout should be added later
-        if done:
-            reward = 0
-        else:
-            reward = -1
-
-        return state, reward, done, {}
+        return self._observation_builder(laser_scan, local_goal)
 
     def reset(self):
 
         # Resets the state of the environment and returns an initial observation.
-        rospy.wait_for_service("/gazebo/set_model_state")
-        try:
-            #reset_proxy.call()
-            self.reset_proxy(self.init_model_state)
-        except (rospy.ServiceException) as e:
-            print ("/gazebo/set_model_state service call failed")
+        self.gazebo_sim.reset()
 
         # Unpause simulation to make observation
-        rospy.wait_for_service('/gazebo/unpause_physics')
-        try:
-            #resp_pause = pause.call()
-            self.unpause()
-        except (rospy.ServiceException) as e:
-            print ("/gazebo/unpause_physics service call failed")
+        self.gazebo_sim.unpause()
 
         #read laser data
-        data = None
-        while data is None:
-            try:
-                data = rospy.wait_for_message('front/scan', LaserScan, timeout=5)
-            except:
-                pass
+        laser_scan = self.gazebo_sim.get_laser_scan()
+        local_goal = self.navi_stack.get_local_goal()
 
-        rospy.wait_for_service('/gazebo/pause_physics')
-        try:
-            #resp_pause = pause.call()
-            self.pause()
-        except (rospy.ServiceException) as e:
-            print ("/gazebo/pause_physics service call failed")
+        self.gazebo_sim.pause()
 
-        state = self.discretize_observation(data,5)
+        state, _, _, _ = self._observation_builder(laser_scan, local_goal)
 
         return state
 
