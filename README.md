@@ -3,7 +3,6 @@ Jakcal environment for navigation:
 ## Installation 
 1. Clone this github repository 
    ```bash
-   # Checkout the latest stable release
    git clone --branch stable https://github.com/Daffan/jackal_envs.git
    cd jackal_envs
    pip install -e .
