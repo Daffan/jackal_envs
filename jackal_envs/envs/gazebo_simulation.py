@@ -8,7 +8,7 @@ from gazebo_msgs.srv import SetModelState, GetModelState
 from geometry_msgs.msg import Quaternion
 from sensor_msgs.msg import LaserScan
 
-from tf.transformations import quaternion_from_euler
+# from tf.transformations import quaternion_from_euler
 
 def create_model_state(x, y, z, yaw):
 
@@ -17,8 +17,8 @@ def create_model_state(x, y, z, yaw):
     model_state.pose.position.x = x
     model_state.pose.position.y = y
     model_state.pose.position.z = z
-    q = quaternion_from_euler(0, 0, yaw)
-    model_state.pose.orientation = Quaternion(*q)
+    # q = quaternion_from_euler(0, 0, yaw)
+    model_state.pose.orientation = Quaternion(0, 0, 0, 1)
     model_state.reference_frame = "world";
 
     return model_state
@@ -37,14 +37,14 @@ class GazeboSimulation():
         rospy.wait_for_service('/gazebo/pause_physics')
         try:
             self._pause()
-        except rospy.ServiceException, e:
+        except rospy.ServiceException:
             print ("/gazebo/pause_physics service call failed")
 
     def unpause(self):
         rospy.wait_for_service('/gazebo/unpause_physics')
         try:
             self._unpause()
-        except rospy.ServiceException, e:
+        except rospy.ServiceException:
             print ("/gazebo/unpause_physics service call failed")
 
     def reset(self):
@@ -54,7 +54,7 @@ class GazeboSimulation():
         try:
             #reset_proxy.call()
             self._reset(self._init_model_state)
-        except (rospy.ServiceException) as e:
+        except (rospy.ServiceException):
             print ("/gazebo/set_model_state service call failed")
 
     def get_laser_scan(self):
@@ -71,5 +71,5 @@ class GazeboSimulation():
         try:
             #reset_proxy.call()
             return self._model_state_getter('jackal', 'world')
-        except (rospy.ServiceException) as e:
+        except (rospy.ServiceException):
             print ("/gazebo/get_model_state service call failed")
