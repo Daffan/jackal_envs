@@ -2,7 +2,7 @@ from jackal_envs.envs import GazeboJackalNavigationEnv
 import time
 
 
-env = GazeboJackalNavigationEnv()
+env = GazeboJackalNavigationEnv(gui = True)
 
 done = False
 count = 0
