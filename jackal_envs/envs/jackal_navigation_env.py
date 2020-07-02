@@ -12,34 +12,52 @@ from std_srvs.srv import Empty
 import actionlib
 from gym.utils import seeding
 
-from gazebo_simulation import GazeboSimulation
-from navigation_stack import  NavigationStack
+from .gazebo_simulation import GazeboSimulation
+from .navigation_stack import  NavigationStack
 
 class GazeboJackalNavigationEnv(gym.Env):
 
-    def __init__(self, config = 'demo_jackal_world_navigation'):
+    def __init__(self, world_name = 'jackal_race.world', VLP16 = 'true', gui = 'false',
+                init_position = [0, 0], goal_position = [6, 6], max_step = 100, time_step = 1,
+                max_vel_x_delta = 0.05, init_max_vel_x = 0.5):
         gym.Env.__init__(self)
 
+        self.world_name = world_name
+        self.VLP16 = True if VLP16=='true' else False
+        self.gui = True if gui=='true' else False
+        self.max_step = max_step
+        self.time_step = time_step
+        self.max_vel_x_delta = max_vel_x_delta
+        self.init_max_vel_x = init_max_vel_x
+
         # Launch gazebo and navigation demo
-        # Should have the system enviroment source to test_pkg
+        # Should have the system enviroment source to jackal_helper
         rospack = rospkg.RosPack()
         BASE_PATH = rospack.get_path('jackal_helper')
-        self.gazebo_process = subprocess.Popen(['roslaunch', os.path.join(BASE_PATH, 'launch', 'jackal_world_navigation.launch')])
+        self.gazebo_process = subprocess.Popen(['roslaunch', \
+                                                os.path.join(BASE_PATH, 'launch', 'jackal_world_navigation.launch'),
+                                                'world_name:=' + world_name,
+                                                'gui:=' + gui,
+                                                'VLP16:=' + VLP16
+                                                ])
 
-        time.sleep(5)
+        time.sleep(10)
         rospy.set_param('/use_sim_time', True)
         rospy.init_node('gym', anonymous=True)
 
-        self.gazebo_sim = GazeboSimulation()
-        self.navi_stack = NavigationStack()
+        self.gazebo_sim = GazeboSimulation(init_position = init_position)
+        self.navi_stack = NavigationStack(goal_position = goal_position)
 
         self.action_space = spaces.Discrete(3) #F,L,R
         self.reward_range = (-np.inf, np.inf)
+        self.observation_space = spaces.Box(low=np.array([0.2]*(2095)), # a hard coding here
+                                            high=np.array([30]*(2095)),
+                                            dtype=np.float)
 
         self._seed()
 
         self.navi_stack.set_global_goal()
-        self.gazebo_sim.pause()
+        self.reset()
 
     def _seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -57,7 +75,7 @@ class GazeboJackalNavigationEnv(gym.Env):
         state = np.concatenate([scan_ranges, local_goal_position])
 
         distance = np.sqrt(np.sum((local_goal_position)**2))
-        if distance < 0.4:
+        if distance < 0.4 or self.time_step >= self.max_step:
             done = True
         else:
             done = False
@@ -65,14 +83,15 @@ class GazeboJackalNavigationEnv(gym.Env):
         return state, -1, done, {}
 
     def step(self, action):
+        self.step_count += 1
         params = rospy.get_param('/move_base/TrajectoryPlannerROS/max_vel_x')
         if action == 0:
             params = params
         elif action == 1:
-            params = params + 0.1
+            params = params + self.max_vel_x_delta
             self.navi_stack.set_max_vel_x(params)
         elif action == 2:
-            params = params - 0.1
+            params = params - self.max_vel_x_delta
             self.navi_stack.set_max_vel_x(params)
         else:
             raise Exception('Action does not exist')
@@ -81,7 +100,7 @@ class GazeboJackalNavigationEnv(gym.Env):
         self.gazebo_sim.unpause()
 
         # Sleep for 5s (a hyperparameter that can be tuned)
-        rospy.sleep(1)
+        rospy.sleep(self.time_step)
 
         # Collect the laser scan data
         laser_scan = self.gazebo_sim.get_laser_scan()
@@ -94,8 +113,13 @@ class GazeboJackalNavigationEnv(gym.Env):
 
     def reset(self):
 
+        self.step_count = 0
         # Resets the state of the environment and returns an initial observation.
         self.gazebo_sim.reset()
+        # reset robot in odom frame
+        self.navi_stack.reset_robot_in_odom()
+        # reset max_vel_x value
+        self.navi_stack.set_max_vel_x(self.init_max_vel_x)
 
         # Unpause simulation to make observation
         self.gazebo_sim.unpause()
@@ -103,6 +127,7 @@ class GazeboJackalNavigationEnv(gym.Env):
         #read laser data
         laser_scan = self.gazebo_sim.get_laser_scan()
         local_goal = self.navi_stack.get_local_goal()
+        self.navi_stack.set_global_goal()
 
         self.gazebo_sim.pause()
 

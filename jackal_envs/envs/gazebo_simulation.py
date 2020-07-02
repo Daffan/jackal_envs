@@ -19,19 +19,19 @@ def create_model_state(x, y, z, yaw):
     model_state.pose.position.z = z
     # q = quaternion_from_euler(0, 0, yaw)
     model_state.pose.orientation = Quaternion(0, 0, 0, 1)
-    model_state.reference_frame = "world";
+    model_state.reference_frame = "";
 
     return model_state
 
 class GazeboSimulation():
 
-    def __init__(self):
+    def __init__(self, init_position = [0, 0]):
         self._pause = rospy.ServiceProxy('/gazebo/pause_physics', Empty)
         self._unpause = rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
         self._reset = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
         self._model_state_getter = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
 
-        self._init_model_state = create_model_state(0,0,0,0)
+        self._init_model_state = create_model_state(init_position[0],init_position[1],0,0)
 
     def pause(self):
         rospy.wait_for_service('/gazebo/pause_physics')
