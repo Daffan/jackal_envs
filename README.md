@@ -8,6 +8,11 @@ Jakcal environment for navigation:
    cd jackal_envs
    pip install -e .
    ```
+2. Install dependencies
+   ```bash
+   sudo apt-get install ros-kinetic-jackal-simulator ros-kinetic-jackal-desktop ros-kinetic-jackal-navigation
+   sudo apt-get install ros-kinetic-velodyne-simulator
+   ```
 2. Prepare workspace 
   ```bash
   mkdir -p jackal_ws/src
