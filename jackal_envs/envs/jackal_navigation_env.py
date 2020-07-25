@@ -18,8 +18,8 @@ from .navigation_stack import  NavigationStack
 class GazeboJackalNavigationEnv(gym.Env):
 
     def __init__(self, world_name = 'jackal_race.world', VLP16 = 'true', gui = 'false',
-                init_position = [0, 0], goal_position = [6, 6], max_step = 100, time_step = 1,
-                max_vel_x_delta = 0.05, init_max_vel_x = 0.5):
+                init_position = [-8, 0, 0], goal_position = [46, 0, 0], max_step = 50, time_step = 1,
+                max_vel_x_delta = 0.2, init_max_vel_x = 0.5):
         gym.Env.__init__(self)
 
         self.world_name = world_name
@@ -50,9 +50,14 @@ class GazeboJackalNavigationEnv(gym.Env):
 
         self.action_space = spaces.Discrete(3) #F,L,R
         self.reward_range = (-np.inf, np.inf)
-        self.observation_space = spaces.Box(low=np.array([0.2]*(2095)), # a hard coding here
-                                            high=np.array([30]*(2095)),
-                                            dtype=np.float)
+        if VLP16 == 'true':
+            self.observation_space = spaces.Box(low=np.array([0.2]*(2095)), # a hard coding here
+                                                high=np.array([30]*(2095)),
+                                                dtype=np.float)
+        elif VLP16 == 'false':
+            self.observation_space = spaces.Box(low=np.array([0.2]*(720)), # a hard coding here
+                                                high=np.array([30]*(720)),
+                                                dtype=np.float)
 
         self._seed()
 
@@ -69,13 +74,15 @@ class GazeboJackalNavigationEnv(gym.Env):
         between gobal goal and robot positon is less than 0.4m. Reward is set
         to -1 for each step
         '''
-        scan_ranges = np.array(laser_scan.ranges)[1:-1]
+        scan_ranges = np.array(laser_scan.ranges)[1:-2]
         scan_ranges[scan_ranges == np.inf] = 30
         local_goal_position = np.array([local_goal.position.x, local_goal.position.y])
+        max_vel = rospy.get_param('/move_base/TrajectoryPlannerROS/max_vel_x')
         state = np.concatenate([scan_ranges, local_goal_position])
+        state = np.append(state, max_vel)
 
         distance = np.sqrt(np.sum((local_goal_position)**2))
-        if distance < 0.4 or self.time_step >= self.max_step:
+        if distance < 0.4 or self.step_count >= self.max_step:
             done = True
         else:
             done = False
@@ -88,11 +95,13 @@ class GazeboJackalNavigationEnv(gym.Env):
         if action == 0:
             params = params
         elif action == 1:
-            params = params + self.max_vel_x_delta
-            self.navi_stack.set_max_vel_x(params)
+            # params = min(2, params + self.max_vel_x_delta)
+            # self.navi_stack.set_max_vel_x(params)
+            pass
         elif action == 2:
-            params = params - self.max_vel_x_delta
-            self.navi_stack.set_max_vel_x(params)
+            # params = max(0.1, params - self.max_vel_x_delta)
+            # self.navi_stack.set_max_vel_x(params)
+            pass
         else:
             raise Exception('Action does not exist')
 
@@ -114,10 +123,10 @@ class GazeboJackalNavigationEnv(gym.Env):
     def reset(self):
 
         self.step_count = 0
+        # reset robot in odom frame clear_costmap
+        self.navi_stack.reset_robot_in_odom()
         # Resets the state of the environment and returns an initial observation.
         self.gazebo_sim.reset()
-        # reset robot in odom frame
-        self.navi_stack.reset_robot_in_odom()
         # reset max_vel_x value
         self.navi_stack.set_max_vel_x(self.init_max_vel_x)
 
@@ -125,6 +134,10 @@ class GazeboJackalNavigationEnv(gym.Env):
         self.gazebo_sim.unpause()
 
         #read laser data
+        self.navi_stack.clear_costmap()
+        rospy.sleep(0.1)
+        self.navi_stack.clear_costmap()
+
         laser_scan = self.gazebo_sim.get_laser_scan()
         local_goal = self.navi_stack.get_local_goal()
         self.navi_stack.set_global_goal()
