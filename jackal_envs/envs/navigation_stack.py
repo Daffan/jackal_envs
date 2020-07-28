@@ -56,6 +56,8 @@ class Robot_config():
         self.gy = 0
         self.gp = 0
         self.los = 1
+        self.bad_vel = 0
+        self.vel_counter = 0
         # self.los = 5
 
     def get_robot_status(self, msg):
@@ -99,6 +101,14 @@ class Robot_config():
         self.global_path = gphat
         # print(self.global_path)
 
+    def vel_monitor(self, msg):
+        vx = msg.linear.x
+        if vx < 0.1:
+            self.bad_vel += 1
+        self.vel_counter += 1
+
+
+
 
 
 def transform_lg(wp, X, Y, PSI):
@@ -124,6 +134,7 @@ class NavigationStack():
         self.robot_config = Robot_config()
         self.sub_robot = rospy.Subscriber("/odometry/filtered", Odometry, self.robot_config.get_robot_status)
         self.sub_gp = rospy.Subscriber("/move_base/TrajectoryPlannerROS/global_plan", Path, self.robot_config.get_global_path)
+        self.sub_vel = rospy.Subscriber("/jackal_velocity_controller/cmd_vel", Twist, self.robot_config.vel_monitor)
 
     def set_max_vel_x(self, params):
 
@@ -161,6 +172,15 @@ class NavigationStack():
 
     def reset_global_goal(self, goal_position = [6, 6, 0]):
         self.global_goal = _create_global_goal(goal_position[0], goal_position[1], goal_position[2])
+
+    def punish_rewrad(self):
+        try:
+            rew =  self.robot_config.bad_vel / self.robot_config.vel_counter * 10.0
+        except:
+            rew = 0
+        self.robot_config.bad_vel = 0
+        self.robot_config.vel_counter = 0
+        return -rew
 
     def get_local_goal(self):
         gp = self.robot_config.global_path

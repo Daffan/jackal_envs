@@ -1,0 +1,6 @@
+setup.py
+jackal_envs.egg-info/PKG-INFO
+jackal_envs.egg-info/SOURCES.txt
+jackal_envs.egg-info/dependency_links.txt
+jackal_envs.egg-info/requires.txt
+jackal_envs.egg-info/top_level.txt
