@@ -15,11 +15,21 @@ from gym.utils import seeding
 from .gazebo_simulation import GazeboSimulation
 from .navigation_stack import  NavigationStack
 
+range_dict = {
+    'max_vel_x': [0.1, 2],
+    'max_vel_theta': [0.314, 3.14],
+    'vx_samples': [1, 12],
+    'vtheta_samples': [1, 40],
+    'path_distance_bias': [0.1, 1.5],
+    'goal_distance_bias': [0.1, 2]
+}
+
 class GazeboJackalNavigationEnv(gym.Env):
 
     def __init__(self, world_name = 'jackal_race.world', VLP16 = 'true', gui = 'false',
                 init_position = [-8, 0, 0], goal_position = [46, 0, 0], max_step = 50, time_step = 1,
-                max_vel_x_delta = 0.2, init_max_vel_x = 0.5):
+                param_delta = [0.2, 0.3, 1, 2, 0.2, 0.2], param_init = [0.5, 1.57, 6, 20, 0.75, 1],
+                param_list = ['max_vel_x', 'max_vel_theta', 'vx_samples', 'vtheta_samples', 'path_distance_bias', 'goal_distance_bias']):
         gym.Env.__init__(self)
 
         self.world_name = world_name
@@ -27,8 +37,11 @@ class GazeboJackalNavigationEnv(gym.Env):
         self.gui = True if gui=='true' else False
         self.max_step = max_step
         self.time_step = time_step
-        self.max_vel_x_delta = max_vel_x_delta
-        self.init_max_vel_x = init_max_vel_x
+        self.param_delta = param_delta
+        self.param_init = param_init
+        self.param_list = param_list
+        assert len(param_delta) == len(param_init) and \
+                len(param_delta) == len(param_list), 'length of params should match'
 
         # Launch gazebo and navigation demo
         # Should have the system enviroment source to jackal_helper
@@ -48,7 +61,7 @@ class GazeboJackalNavigationEnv(gym.Env):
         self.gazebo_sim = GazeboSimulation(init_position = init_position)
         self.navi_stack = NavigationStack(goal_position = goal_position)
 
-        self.action_space = spaces.Discrete(3) #F,L,R
+        self.action_space = spaces.MultiDiscrete([2]*len(param_list))
         self.reward_range = (-np.inf, np.inf)
         if VLP16 == 'true':
             self.observation_space = spaces.Box(low=np.array([0.2]*(2095)), # a hard coding here
@@ -91,19 +104,13 @@ class GazeboJackalNavigationEnv(gym.Env):
 
     def step(self, action):
         self.step_count += 1
-        params = rospy.get_param('/move_base/TrajectoryPlannerROS/max_vel_x')
-        if action == 0:
-            params = params
-        elif action == 1:
-            # params = min(2, params + self.max_vel_x_delta)
-            # self.navi_stack.set_max_vel_x(params)
-            pass
-        elif action == 2:
-            # params = max(0.1, params - self.max_vel_x_delta)
-            # self.navi_stack.set_max_vel_x(params)
-            pass
-        else:
-            raise Exception('Action does not exist')
+        for a, d, pn in zip(action, self.param_delta, self. param_list):
+            param = self.navi_stack.get_navi_param(pn)
+            if a == 0:
+                param = max(range_dict[pn][0], param - d)
+            elif a == 1:
+                param = min(range_dict[pn][1], param + d)
+            self.navi_stack.set_navi_param(pn, param)
 
         # Unpause the world
         self.gazebo_sim.unpause()
@@ -128,7 +135,8 @@ class GazeboJackalNavigationEnv(gym.Env):
         # Resets the state of the environment and returns an initial observation.
         self.gazebo_sim.reset()
         # reset max_vel_x value
-        self.navi_stack.set_max_vel_x(self.init_max_vel_x)
+        for init, pn in zip(self.param_init, self.param_list):
+            self.navi_stack.set_navi_param(pn, init)
 
         # Unpause simulation to make observation
         self.gazebo_sim.unpause()
