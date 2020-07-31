@@ -27,7 +27,7 @@ range_dict = {
 class GazeboJackalNavigationEnv(gym.Env):
 
     def __init__(self, world_name = 'jackal_race.world', VLP16 = 'true', gui = 'false',
-                init_position = [-8, 0, 0], goal_position = [46, 0, 0], max_step = 50, time_step = 1,
+                init_position = [-8, 0, 0], goal_position = [46, 0, 0], max_step = 300, time_step = 1,
                 param_delta = [0.2, 0.3, 1, 2, 0.2, 0.2], param_init = [0.5, 1.57, 6, 20, 0.75, 1],
                 param_list = ['max_vel_x', 'max_vel_theta', 'vx_samples', 'vtheta_samples', 'path_distance_bias', 'goal_distance_bias']):
         gym.Env.__init__(self)
@@ -68,8 +68,8 @@ class GazeboJackalNavigationEnv(gym.Env):
                                                 high=np.array([30]*(2095)),
                                                 dtype=np.float)
         elif VLP16 == 'false':
-            self.observation_space = spaces.Box(low=np.array([0.2]*(720)), # a hard coding here
-                                                high=np.array([30]*(720)),
+            self.observation_space = spaces.Box(low=np.array([0.2]*(721+len(self.param_list))), # a hard coding here
+                                                high=np.array([30]*(721+len(self.param_list))),
                                                 dtype=np.float)
 
         self._seed()
@@ -87,12 +87,13 @@ class GazeboJackalNavigationEnv(gym.Env):
         between gobal goal and robot positon is less than 0.4m. Reward is set
         to -1 for each step
         '''
-        scan_ranges = np.array(laser_scan.ranges)[1:-2]
+        scan_ranges = np.array(laser_scan.ranges)
         scan_ranges[scan_ranges == np.inf] = 30
-        local_goal_position = np.array([local_goal.position.x, local_goal.position.y])
-        max_vel = rospy.get_param('/move_base/TrajectoryPlannerROS/max_vel_x')
-        state = np.concatenate([scan_ranges, local_goal_position])
-        state = np.append(state, max_vel)
+        local_goal_position = np.array([np.arctan(local_goal.position.x/local_goal.position.y)])
+        params = []
+        for pn in self.param_list:
+            params.append(self.navi_stack.get_navi_param(pn))
+        state = np.concatenate([scan_ranges, local_goal_position, np.array(params)])
 
         distance = np.sqrt(np.sum((local_goal_position)**2))
         if distance < 0.4 or self.step_count >= self.max_step:
