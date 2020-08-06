@@ -50,6 +50,7 @@ class Robot_config():
     def __init__(self):
         self.X = 0 # inertia frame
         self.Y = 0
+        self.Z = 0
         self.PSI = 0
         self.global_path = []
         self.gx = 0 # body frame
@@ -67,6 +68,7 @@ class Robot_config():
         q0 = msg.pose.pose.orientation.w
         self.X = msg.pose.pose.position.x
         self.Y = msg.pose.pose.position.y
+        self.Z = msg.pose.pose.position.z
         self.PSI = np.arctan2(2 * (q0*q3 + q1*q2), (1 - 2*(q2**2+q3**2)))
         #print(self.X, self.Y, self.PSI)
 
@@ -141,6 +143,10 @@ class NavigationStack():
         self.client.update_configuration({param_name: param})
         rospy.set_param('/move_base/TrajectoryPlannerROS/' + param_name, param)
 
+        if param_name == 'max_vel_theta':
+            self.client.update_configuration({'min_vel_theta': -param})
+            rospy.set_param('/move_base/TrajectoryPlannerROS/' + 'min_vel_theta', -param)
+
     def get_navi_param(self, param_name):
         param = rospy.get_param('/move_base/TrajectoryPlannerROS/' + param_name)
         return param
@@ -179,7 +185,7 @@ class NavigationStack():
 
     def punish_rewrad(self):
         try:
-            rew =  self.robot_config.bad_vel / self.robot_config.vel_counter * 10.0
+            rew =  self.robot_config.bad_vel / self.robot_config.vel_counter * 10.
         except:
             rew = 0
         self.robot_config.bad_vel = 0

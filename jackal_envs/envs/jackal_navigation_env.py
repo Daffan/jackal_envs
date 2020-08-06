@@ -18,8 +18,8 @@ from .navigation_stack import  NavigationStack
 range_dict = {
     'max_vel_x': [0.1, 2],
     'max_vel_theta': [0.314, 3.14],
-    'vx_samples': [1, 12],
-    'vtheta_samples': [1, 40],
+    'vx_samples': [4, 12],
+    'vtheta_samples': [8, 40],
     'path_distance_bias': [0.1, 1.5],
     'goal_distance_bias': [0.1, 2]
 }
@@ -27,7 +27,7 @@ range_dict = {
 class GazeboJackalNavigationEnv(gym.Env):
 
     def __init__(self, world_name = 'jackal_race.world', VLP16 = 'true', gui = 'false',
-                init_position = [-8, 0, 0], goal_position = [46, 0, 0], max_step = 300, time_step = 1,
+                init_position = [-8, 0, 0], goal_position = [54, 0, 0], max_step = 300, time_step = 1,
                 param_delta = [0.2, 0.3, 1, 2, 0.2, 0.2], param_init = [0.5, 1.57, 6, 20, 0.75, 1],
                 param_list = ['max_vel_x', 'max_vel_theta', 'vx_samples', 'vtheta_samples', 'path_distance_bias', 'goal_distance_bias']):
         gym.Env.__init__(self)
@@ -37,6 +37,7 @@ class GazeboJackalNavigationEnv(gym.Env):
         self.gui = True if gui=='true' else False
         self.max_step = max_step
         self.time_step = time_step
+        self.goal_position = goal_position
         self.param_delta = param_delta
         self.param_init = param_init
         self.param_list = param_list
@@ -73,7 +74,6 @@ class GazeboJackalNavigationEnv(gym.Env):
                                                 dtype=np.float)
 
         self._seed()
-
         self.navi_stack.set_global_goal()
         self.reset()
 
@@ -95,26 +95,30 @@ class GazeboJackalNavigationEnv(gym.Env):
             params.append(self.navi_stack.get_navi_param(pn))
         state = np.concatenate([scan_ranges, local_goal_position, np.array(params)])
 
-        distance = np.sqrt(np.sum((local_goal_position)**2))
-        if distance < 0.4 or self.step_count >= self.max_step:
+        pr = np.array([self.navi_stack.robot_config.X, self.navi_stack.robot_config.Y])
+        gpl = np.array(self.goal_position[:2])
+        self.gp_len = np.sqrt(np.sum((pr-gpl)**2))
+        if self.gp_len < 0.4 or pr[0] >= 50 or self.step_count >= self.max_step:
             done = True
         else:
             done = False
 
-        return state, -1, done, {}
+        return state, -1, done, {'params': params}
 
     def step(self, action):
         self.step_count += 1
-        for a, d, pn in zip(action, self.param_delta, self. param_list):
+        i = 0
+        for a, d, pn in zip(action, self.param_delta, self.param_list):
             param = self.navi_stack.get_navi_param(pn)
             if a == 0:
                 param = max(range_dict[pn][0], param - d)
             elif a == 1:
                 param = min(range_dict[pn][1], param + d)
+            i += 1
             self.navi_stack.set_navi_param(pn, param)
 
         # Unpause the world
-        self.gazebo_sim.unpause()
+        # self.gazebo_sim.unpause()
 
         # Sleep for 5s (a hyperparameter that can be tuned)
         rospy.sleep(self.time_step)
@@ -124,7 +128,7 @@ class GazeboJackalNavigationEnv(gym.Env):
         local_goal = self.navi_stack.get_local_goal()
 
         # Pause the simulation world
-        self.gazebo_sim.pause()
+        # self.gazebo_sim.pause()
 
         return self._observation_builder(laser_scan, local_goal)
 
@@ -140,7 +144,7 @@ class GazeboJackalNavigationEnv(gym.Env):
             self.navi_stack.set_navi_param(pn, init)
 
         # Unpause simulation to make observation
-        self.gazebo_sim.unpause()
+        # self.gazebo_sim.unpause()
 
         #read laser data
         self.navi_stack.clear_costmap()
@@ -151,7 +155,7 @@ class GazeboJackalNavigationEnv(gym.Env):
         local_goal = self.navi_stack.get_local_goal()
         self.navi_stack.set_global_goal()
 
-        self.gazebo_sim.pause()
+        # self.gazebo_sim.pause()
 
         state, _, _, _ = self._observation_builder(laser_scan, local_goal)
 
@@ -162,24 +166,6 @@ class GazeboJackalNavigationEnv(gym.Env):
         os.system("killall -9 gzclient")
         os.system("killall -9 gzserver")
         os.system("killall -9 roscore")
-        # Kill gzclient, gzserver and roscore
-        tmp = os.popen("ps -Af").read()
-        gzclient_count = tmp.count('gzclient')
-        gzserver_count = tmp.count('gzserver')
-        roscore_count = tmp.count('roscore')
-        rosmaster_count = tmp.count('rosmaster')
-
-        if gzclient_count > 0:
-            os.system("killall -9 gzclient")
-        if gzserver_count > 0:
-            os.system("killall -9 gzserver")
-        if rosmaster_count > 0:
-            os.system("killall -9 rosmaster")
-        if roscore_count > 0:
-            os.system("killall -9 roscore")
-
-        if (gzclient_count or gzserver_count or roscore_count or rosmaster_count >0):
-            os.wait()
 
 if __name__ == '__main__':
     env = GazeboJackalNavigationEnv()
