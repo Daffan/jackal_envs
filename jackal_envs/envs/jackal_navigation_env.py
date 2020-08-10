@@ -26,7 +26,7 @@ range_dict = {
 
 class GazeboJackalNavigationEnv(gym.Env):
 
-    def __init__(self, world_name = 'jackal_race.world', VLP16 = 'true', gui = 'false',
+    def __init__(self, world_name = 'jackal_race.world', VLP16 = 'true', gui = 'false', camera = 'false',
                 init_position = [-8, 0, 0], goal_position = [54, 0, 0], max_step = 300, time_step = 1,
                 param_delta = [0.2, 0.3, 1, 2, 0.2, 0.2], param_init = [0.5, 1.57, 6, 20, 0.75, 1],
                 param_list = ['max_vel_x', 'max_vel_theta', 'vx_samples', 'vtheta_samples', 'path_distance_bias', 'goal_distance_bias']):
@@ -52,7 +52,8 @@ class GazeboJackalNavigationEnv(gym.Env):
                                                 os.path.join(BASE_PATH, 'launch', 'jackal_world_navigation.launch'),
                                                 'world_name:=' + world_name,
                                                 'gui:=' + gui,
-                                                'VLP16:=' + VLP16
+                                                'VLP16:=' + VLP16,
+                                                'camera:=' + camera
                                                 ])
 
         time.sleep(10)
@@ -62,15 +63,15 @@ class GazeboJackalNavigationEnv(gym.Env):
         self.gazebo_sim = GazeboSimulation(init_position = init_position)
         self.navi_stack = NavigationStack(goal_position = goal_position)
 
-        self.action_space = spaces.MultiDiscrete([2]*len(param_list))
+        self.action_space = spaces.Discrete(2**len(param_list))
         self.reward_range = (-np.inf, np.inf)
         if VLP16 == 'true':
-            self.observation_space = spaces.Box(low=np.array([0.2]*(2095)), # a hard coding here
-                                                high=np.array([30]*(2095)),
+            self.observation_space = spaces.Box(low=np.array([-1]*(2095)), # a hard coding here
+                                                high=np.array([1]*(2095)),
                                                 dtype=np.float)
         elif VLP16 == 'false':
-            self.observation_space = spaces.Box(low=np.array([0.2]*(721+len(self.param_list))), # a hard coding here
-                                                high=np.array([30]*(721+len(self.param_list))),
+            self.observation_space = spaces.Box(low=np.array([-1]*(721+len(self.param_list))), # a hard coding here
+                                                high=np.array([1]*(721+len(self.param_list))),
                                                 dtype=np.float)
 
         self._seed()
@@ -88,12 +89,14 @@ class GazeboJackalNavigationEnv(gym.Env):
         to -1 for each step
         '''
         scan_ranges = np.array(laser_scan.ranges)
-        scan_ranges[scan_ranges == np.inf] = 30
+        scan_ranges[scan_ranges == np.inf] = 20
         local_goal_position = np.array([np.arctan(local_goal.position.x/local_goal.position.y)])
         params = []
+        params_normal = []
         for pn in self.param_list:
             params.append(self.navi_stack.get_navi_param(pn))
-        state = np.concatenate([scan_ranges, local_goal_position, np.array(params)])
+            params_normal.append(params[-1]/float(range_dict[pn][1]))
+        state = np.concatenate([scan_ranges/20.0, local_goal_position/np.pi, np.array(params_normal)])
 
         pr = np.array([self.navi_stack.robot_config.X, self.navi_stack.robot_config.Y])
         gpl = np.array(self.goal_position[:2])
@@ -106,9 +109,13 @@ class GazeboJackalNavigationEnv(gym.Env):
         return state, -1, done, {'params': params}
 
     def step(self, action):
+        assert action < 2**len(self.param_list)
+        action_bin = [int(s) for s in bin(action).replace('0b', '')]
+        action_bin = [0]*(len(self.param_list)-len(action_bin)) + action_bin
+        assert len(action_bin) == len(self.param_list)
         self.step_count += 1
         i = 0
-        for a, d, pn in zip(action, self.param_delta, self.param_list):
+        for a, d, pn in zip(action_bin, self.param_delta, self.param_list):
             param = self.navi_stack.get_navi_param(pn)
             if a == 0:
                 param = max(range_dict[pn][0], param - d)
