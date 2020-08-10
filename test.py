@@ -1,8 +1,13 @@
-from jackal_envs.envs import GazeboJackalNavigationEnv
 import time
 
+import gym
+import jackal_envs
+from jackal_sim_wrapper import RandomStartGoalPosition, ReducedObservation, RewardShaping
 
-env = GazeboJackalNavigationEnv(gui = True)
+env = gym.make('jackal_navigation-v0', world_name = '75cm_split.world', gui = 'false', VLP16 = 'false', camera = 'false')
+# env = ReducedObservation(gym.make('jackal_navigation-v0', world_name = '85cm_split.world', gui = 'true', VLP16 = 'false'))
+# env = RandomStartGoalPosition(gym.make('jackal_navigation-v0', world_name = '85cm_split.world', gui = 'true', VLP16 = 'false'))
+# env = RewardShaping(gym.make('jackal_navigation-v0', world_name = 'sequential_applr_testbed.world', gui = 'true', VLP16 = 'false', init_position = [-8, 0, 0], goal_position = [54, 0, 0]))
 
 done = False
 count = 0
@@ -16,13 +21,3 @@ while not done:
 print(env.gazebo_sim.get_model_state())
 
 env.close()
-
-import gym
-import jackal_envs
-from jackal_sim_wrapper import RandomStartGoalPosition, ReducedObservation, RewardShaping
-from helper import visual_laserscan, obs_reduction
-
-env = gym.make('jackal_navigation-v0', world_name = '75cm_split.world', gui = 'true', VLP16 = 'false', camera = 'true')
-env = ReducedObservation(gym.make('jackal_navigation-v0', world_name = '85cm_split.world', gui = 'true', VLP16 = 'false'))
-env = RandomStartGoalPosition(gym.make('jackal_navigation-v0', world_name = '85cm_split.world', gui = 'true', VLP16 = 'false'))
-env = RewardShaping(gym.make('jackal_navigation-v0', world_name = 'sequential_applr_testbed.world', gui = 'true', VLP16 = 'false', init_position = [-8, 0, 0], goal_position = [54, 0, 0]))
