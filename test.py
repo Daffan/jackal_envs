@@ -2,7 +2,7 @@ import time
 
 import gym
 import jackal_envs
-from jackal_sim_wrapper import RandomStartGoalPosition, ReducedObservation, RewardShaping
+# from jackal_sim_wrapper import RandomStartGoalPosition, ReducedObservation, RewardShaping
 
 env = gym.make('jackal_navigation-v0', world_name = '75cm_split.world', gui = 'false', VLP16 = 'false', camera = 'false')
 # env = ReducedObservation(gym.make('jackal_navigation-v0', world_name = '85cm_split.world', gui = 'true', VLP16 = 'false'))
