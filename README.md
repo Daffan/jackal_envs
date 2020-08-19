@@ -7,7 +7,6 @@ Assume the installation in ros-melodic with Ubuntu 18.04
    ```bash
    git clone --branch stable https://github.com/Daffan/jackal_envs.git
    cd jackal_envs
-   pip install -e .
    pip install -r requirements.txt
    ```
 2. Install dependencies
@@ -32,4 +31,4 @@ Assume the installation in ros-melodic with Ubuntu 18.04
   source /devel/setup.bash
   python ../jackal_envs/test.py
   ```
-  This will run an eqisode of navigation to a goal position x = 6, y = 6, with each step 1s duration. 
+  This will run an eqisode of navigation to a goal position x = 2, y = 2, with each step 1s duration. 
