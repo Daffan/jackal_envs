@@ -16,6 +16,7 @@ Assume the installation in ros-melodic with Ubuntu 18.04
    ```
 2. Prepare workspace 
   ```bash
+  cd ..
   mkdir -p jackal_ws/src
   cd jackal_ws/src
   git clone https://github.com/Daffan/jackal_helper.git
@@ -28,7 +29,7 @@ Assume the installation in ros-melodic with Ubuntu 18.04
   ```
 3. Test
   ```bash
-  source /devel/setup.bash
+  source devel/setup.bash
   python ../jackal_envs/test.py
   ```
   This will run an eqisode of navigation to a goal position x = 2, y = 2, with each step 1s duration. 
