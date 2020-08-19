@@ -13,7 +13,7 @@ done = False
 count = 0
 while not done:
     count += 1
-    obs, rew, done, _ = env.step([0, 0, 0, 0, 0, 0])
+    obs, rew, done, _ = env.step(0)
     print('current step %d' %(count))
     if count > 40:
         break
