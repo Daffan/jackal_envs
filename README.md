@@ -5,9 +5,9 @@ Assume the installation in ros-melodic with Ubuntu 18.04
 
 1. Clone this github repository 
    ```bash
-   git clone --branch stable https://github.com/Daffan/jackal_envs.git
+   git clone https://github.com/Daffan/jackal_envs.git
    cd jackal_envs
-   pip install -r requirements.txt
+   pip install -e .
    ```
 2. Install dependencies
    ```bash
