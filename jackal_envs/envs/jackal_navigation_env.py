@@ -29,7 +29,8 @@ class GazeboJackalNavigationEnv(gym.Env):
     def __init__(self, world_name = 'jackal_race.world', VLP16 = 'true', gui = 'false', camera = 'false',
                 init_position = [-8, 0, 0], goal_position = [54, 0, 0], max_step = 300, time_step = 1,
                 param_delta = [0.2, 0.3, 1, 2, 0.2, 0.2], param_init = [0.5, 1.57, 6, 20, 0.75, 1],
-                param_list = ['max_vel_x', 'max_vel_theta', 'vx_samples', 'vtheta_samples', 'path_distance_bias', 'goal_distance_bias']):
+                param_list = ['max_vel_x', 'max_vel_theta', 'vx_samples', 'vtheta_samples', 'path_distance_bias', 'goal_distance_bias'],
+                init_world = True, verbose = 1):
         gym.Env.__init__(self)
 
         self.world_name = world_name
@@ -46,15 +47,17 @@ class GazeboJackalNavigationEnv(gym.Env):
 
         # Launch gazebo and navigation demo
         # Should have the system enviroment source to jackal_helper
-        rospack = rospkg.RosPack()
-        BASE_PATH = rospack.get_path('jackal_helper')
-        self.gazebo_process = subprocess.Popen(['roslaunch', \
-                                                os.path.join(BASE_PATH, 'launch', 'jackal_world_navigation.launch'),
-                                                'world_name:=' + world_name,
-                                                'gui:=' + gui,
-                                                'VLP16:=' + VLP16,
-                                                'camera:=' + camera
-                                                ])
+        stdout = None if verbose == 1 else open(os.devnull, 'wb')
+        if init_world:
+            rospack = rospkg.RosPack()
+            BASE_PATH = rospack.get_path('jackal_helper')
+            self.gazebo_process = subprocess.Popen(['roslaunch', \
+                                                    os.path.join(BASE_PATH, 'launch', 'jackal_world_navigation.launch'),
+                                                    'world_name:=' + world_name,
+                                                    'gui:=' + gui,
+                                                    'VLP16:=' + VLP16,
+                                                    'camera:=' + camera
+                                                    ], stdout=open(os.devnull, 'wb'))
 
         time.sleep(10)
         rospy.set_param('/use_sim_time', True)
@@ -63,7 +66,7 @@ class GazeboJackalNavigationEnv(gym.Env):
         self.gazebo_sim = GazeboSimulation(init_position = init_position)
         self.navi_stack = NavigationStack(goal_position = goal_position)
 
-        self.action_space = spaces.Discrete(2**len(param_list))
+        self.action_space = spaces.Discrete(2**len(param_list)+1)
         self.reward_range = (-np.inf, np.inf)
         if VLP16 == 'true':
             self.observation_space = spaces.Box(low=np.array([-1]*(2095)), # a hard coding here
@@ -73,10 +76,10 @@ class GazeboJackalNavigationEnv(gym.Env):
             self.observation_space = spaces.Box(low=np.array([-1]*(721+len(self.param_list))), # a hard coding here
                                                 high=np.array([1]*(721+len(self.param_list))),
                                                 dtype=np.float)
-
-        self._seed()
-        self.navi_stack.set_global_goal()
-        self.reset()
+        if init_world:
+            self._seed()
+            self.navi_stack.set_global_goal()
+            self.reset()
 
     def _seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -101,6 +104,7 @@ class GazeboJackalNavigationEnv(gym.Env):
         pr = np.array([self.navi_stack.robot_config.X, self.navi_stack.robot_config.Y])
         gpl = np.array(self.goal_position[:2])
         self.gp_len = np.sqrt(np.sum((pr-gpl)**2))
+
         if self.gp_len < 0.4 or pr[0] >= 50 or self.step_count >= self.max_step:
             done = True
         else:
@@ -109,23 +113,31 @@ class GazeboJackalNavigationEnv(gym.Env):
         return state, -1, done, {'params': params}
 
     def step(self, action):
-        assert action < 2**len(self.param_list)
-        action_bin = [int(s) for s in bin(action).replace('0b', '')]
-        action_bin = [0]*(len(self.param_list)-len(action_bin)) + action_bin
-        assert len(action_bin) == len(self.param_list)
-        self.step_count += 1
-        i = 0
-        for a, d, pn in zip(action_bin, self.param_delta, self.param_list):
-            param = self.navi_stack.get_navi_param(pn)
-            if a == 0:
-                param = max(range_dict[pn][0], param - d)
-            elif a == 1:
-                param = min(range_dict[pn][1], param + d)
-            i += 1
-            self.navi_stack.set_navi_param(pn, param)
+        assert action < 2**len(self.param_list) + 1
+        if action < 2**len(self.param_list): # real action
+            action_bin = [int(s) for s in bin(action).replace('0b', '')]
+            action_bin = [0]*(len(self.param_list)-len(action_bin)) + action_bin
+            assert len(action_bin) == len(self.param_list)
+
+            try: # for the case when running in the container, it doesn't call self.reset()
+                self.step_count += 1
+            except:
+                self.step_count = 0
+
+            i = 0
+            for a, d, pn in zip(action_bin, self.param_delta, self.param_list):
+                param = self.navi_stack.get_navi_param(pn)
+                if a == 0:
+                    param = max(range_dict[pn][0], param - d)
+                elif a == 1:
+                    param = min(range_dict[pn][1], param + d)
+                i += 1
+                self.navi_stack.set_navi_param(pn, param)
+        else: # the last action is pass without doing anything
+            pass
 
         # Unpause the world
-        # self.gazebo_sim.unpause()
+        self.gazebo_sim.unpause()
 
         # Sleep for 5s (a hyperparameter that can be tuned)
         rospy.sleep(self.time_step)
@@ -135,7 +147,7 @@ class GazeboJackalNavigationEnv(gym.Env):
         local_goal = self.navi_stack.get_local_goal()
 
         # Pause the simulation world
-        # self.gazebo_sim.pause()
+        self.gazebo_sim.pause()
 
         return self._observation_builder(laser_scan, local_goal)
 
@@ -151,7 +163,7 @@ class GazeboJackalNavigationEnv(gym.Env):
             self.navi_stack.set_navi_param(pn, init)
 
         # Unpause simulation to make observation
-        # self.gazebo_sim.unpause()
+        self.gazebo_sim.unpause()
 
         #read laser data
         self.navi_stack.clear_costmap()
@@ -162,7 +174,7 @@ class GazeboJackalNavigationEnv(gym.Env):
         local_goal = self.navi_stack.get_local_goal()
         self.navi_stack.set_global_goal()
 
-        # self.gazebo_sim.pause()
+        self.gazebo_sim.pause()
 
         state, _, _, _ = self._observation_builder(laser_scan, local_goal)
 
