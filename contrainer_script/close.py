@@ -8,8 +8,10 @@ with open(parser.config, 'rb') as f:
     config = json.load(f)
 
 env_config = config['env_config']
-env_config['init_world'] = True
+env_config['init_world'] = False
 wrapper_config = config['wrapper_config']
 
 wrapper_dict = jackal_envs.jackal_sim_wrapper.wrapper_dict
-env = wrapper_dict[wrapper_config['wrapper']](gym.make('jackal_navigation-v0', **env_config), wrapper_config['wrapper_args'])
+env = wrapper_dict[wrapper_config['wrapper']](gym.make('jackal_navigation-v0', **env_config), wrapper_config['wrapper_args'], init_world = False)
+
+obs = env.close()
