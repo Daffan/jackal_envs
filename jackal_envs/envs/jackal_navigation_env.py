@@ -15,6 +15,8 @@ from gym.utils import seeding
 from .gazebo_simulation import GazeboSimulation
 from .navigation_stack import  NavigationStack
 
+gym.logger.set_level(40)
+
 range_dict = {
     'max_vel_x': [0.1, 2],
     'max_vel_theta': [0.314, 3.14],
@@ -71,11 +73,11 @@ class GazeboJackalNavigationEnv(gym.Env):
         if VLP16 == 'true':
             self.observation_space = spaces.Box(low=np.array([-1]*(2095)), # a hard coding here
                                                 high=np.array([1]*(2095)),
-                                                dtype=np.float)
+                                                dtype=np.float32)
         elif VLP16 == 'false':
             self.observation_space = spaces.Box(low=np.array([-1]*(721+len(self.param_list))), # a hard coding here
                                                 high=np.array([1]*(721+len(self.param_list))),
-                                                dtype=np.float)
+                                                dtype=np.float32)
         if init_world:
             self._seed()
             self.navi_stack.set_global_goal()
