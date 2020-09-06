@@ -30,7 +30,7 @@ class GazeboJackalNavigationEnv(gym.Env):
                 init_position = [-8, 0, 0], goal_position = [54, 0, 0], max_step = 300, time_step = 1,
                 param_delta = [0.2, 0.3, 1, 2, 0.2, 0.2], param_init = [0.5, 1.57, 6, 20, 0.75, 1],
                 param_list = ['max_vel_x', 'max_vel_theta', 'vx_samples', 'vtheta_samples', 'path_distance_bias', 'goal_distance_bias'],
-                init_world = True, verbose = 1):
+                init_world = True):
         gym.Env.__init__(self)
 
         self.world_name = world_name
@@ -47,7 +47,6 @@ class GazeboJackalNavigationEnv(gym.Env):
 
         # Launch gazebo and navigation demo
         # Should have the system enviroment source to jackal_helper
-        stdout = None if verbose == 1 else open(os.devnull, 'wb')
         if init_world:
             rospack = rospkg.RosPack()
             BASE_PATH = rospack.get_path('jackal_helper')
@@ -57,7 +56,7 @@ class GazeboJackalNavigationEnv(gym.Env):
                                                     'gui:=' + gui,
                                                     'VLP16:=' + VLP16,
                                                     'camera:=' + camera
-                                                    ], stdout=open(os.devnull, 'wb'))
+                                                    ])
             time.sleep(10)
 
 
