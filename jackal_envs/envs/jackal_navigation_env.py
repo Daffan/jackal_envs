@@ -93,7 +93,8 @@ class GazeboJackalNavigationEnv(gym.Env):
         '''
         scan_ranges = np.array(laser_scan.ranges)
         scan_ranges[scan_ranges == np.inf] = 20
-        local_goal_position = np.array([np.arctan(local_goal.position.x/local_goal.position.y)])
+        y = 0.001 if abs(local_goal.position.y) < 0.001 else local_goal.position.y
+        local_goal_position = np.array([np.arctan(local_goal.position.x/y)])
         params = []
         params_normal = []
         for pn in self.param_list:
