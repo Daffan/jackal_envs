@@ -58,8 +58,9 @@ class GazeboJackalNavigationEnv(gym.Env):
                                                     'VLP16:=' + VLP16,
                                                     'camera:=' + camera
                                                     ], stdout=open(os.devnull, 'wb'))
+            time.sleep(10)
 
-        time.sleep(10)
+
         rospy.set_param('/use_sim_time', True)
         rospy.init_node('gym', anonymous=True)
 
@@ -112,6 +113,12 @@ class GazeboJackalNavigationEnv(gym.Env):
             done = False
 
         return state, -1, done, {'params': params}
+
+    def _set_param(self, param_name, param):
+        rospy.set_param(param_name, float(param))
+
+    def _get_param(self, param_name):
+        return rospy.get_param(param_name)
 
     def step(self, action):
         assert action < 2**len(self.param_list) + 1

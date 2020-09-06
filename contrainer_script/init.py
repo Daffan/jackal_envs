@@ -1,10 +1,13 @@
 import jackal_envs
 import json
 import argparse
+import gym
 
 parser = argparse.ArgumentParser(description = 'step the existing environment')
 parser.add_argument('--config', dest = 'config_path', type = str, default = '../configs/ppo.json', help = 'path to the configuration file')
-with open(parser.config, 'rb') as f:
+args = parser.parse_args()
+
+with open(args.config_path, 'rb') as f:
     config = json.load(f)
 
 env_config = config['env_config']

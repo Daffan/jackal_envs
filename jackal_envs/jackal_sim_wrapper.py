@@ -116,8 +116,8 @@ class RewardShaping(gym.Wrapper):
 
     def reset(self):
         obs = self.env.reset()
-        self.pre_gp_len = self.env.gp_len
-        self.rp = []
+        self.env._set_param('/pre_gp_len', self.env.gp_len)
+        # self.rp = []
         return obs
 
     def visual_path(self):
@@ -130,17 +130,18 @@ class RewardShaping(gym.Wrapper):
         obs, rew, done, info = self.env.step(action)
         # reward is the decrease of the distance
         if self.goal_distance_reward:
-            rew += (-self.env.gp_len + self.pre_gp_len)
+            rew += (-self.env.gp_len + self.env._get_param('/pre_gp_len'))
+        self.env._set_param('/pre_gp_len', self.env.gp_len)
         rew += self.env.navi_stack.punish_rewrad()*self.stuck_punishment
         self.pre_gp_len = self.env.gp_len
         msg = self.env.gazebo_sim.get_model_state()
-        rp = np.array([msg.pose.position.x, msg.pose.position.y])
-        self.rp.append(rp)
+        # rp = np.array([msg.pose.position.x, msg.pose.position.y])
+        # self.rp.append(rp)
 
-        if len(self.rp) > 100:
-            if (np.sqrt(np.sum((self.rp[-1]-self.rp[-100])**2))) < 0.4:
-                done = True
-                rew = -300
+        # if len(self.rp) > 100:
+        #     if (np.sqrt(np.sum((self.rp[-1]-self.rp[-100])**2))) < 0.4:
+        #         done = True
+        #         rew = -300
         if msg.pose.position.z > 0.1: # or
             done = True
             rew = -300
