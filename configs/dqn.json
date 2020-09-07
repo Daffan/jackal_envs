@@ -32,7 +32,7 @@
     }
   },
   "training_config": {
-    "num_envs": 4,
+    "num_envs": 2,
     "learning_rate": 0.001,
     "layer_num": 3,
     "hidden_layer_size": 128,

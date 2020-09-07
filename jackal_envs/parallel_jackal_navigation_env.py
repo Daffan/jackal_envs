@@ -15,12 +15,15 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
         self.client = docker.from_env()
         container = self.client.containers.run('zifanxu/ros-jackal', detach = True, tty=True,
                                                 volumes={self.dirname:{'bind': '/home/configs/', 'mode': 'rw'}})
-        _, out = container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
+        exit_code, out = container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
                                     python3 /home/jackal_envs/contrainer_script/init.py \
                                     --config /home/configs/%s'" %(self.basename))
         self.container = container
-        # print(out)
+        if exit_code != 0:
+            print(out)
+            return
         out = out.decode('utf-8')
+        print(out)
         state_shape = re.search("\[state_shape:(.*)\]", out).group(1)
         state_shape = int(state_shape)
 
@@ -34,21 +37,27 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
         self.reward_range = (-np.inf, np.inf)
 
     def reset(self):
-        _, out = self.container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
+        exit_code, out = self.container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
                                     python3 /home/jackal_envs/contrainer_script/reset.py \
                                     --config /home/configs/%s'" %(self.basename))
         out = out.decode('utf-8').replace('\n', '')
+        if exit_code != 0:
+            print(out)
+            return
         obs = re.search("Observation:\[(.*)\]", out).group(1)
         obs = obs.split(' ')
         obs = [float(s) for s in obs if s]
         return np.array(obs)
 
     def step(self, action):
-        _, out = self.container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
+        exit_code, out = self.container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
                                     python3 /home/jackal_envs/contrainer_script/step.py \
                                     --config /home/configs/%s \
                                     --action %d'" %(self.basename, action))
         out = out.decode('utf-8').replace('\n', '')
+        if exit_code != 0:
+            print(out)
+            return
         # pharse observation
         obs = re.search("\[Observation\]\[(.*)\]\[Reward\]", out).group(1)
         obs = obs.split(' ')

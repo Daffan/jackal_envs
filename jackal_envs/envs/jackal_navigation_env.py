@@ -108,7 +108,7 @@ class GazeboJackalNavigationEnv(gym.Env):
         gpl = np.array(self.goal_position[:2])
         self.gp_len = np.sqrt(np.sum((pr-gpl)**2))
 
-        if self.gp_len < 0.4 or pr[0] >= 50 or self.step_count >= self.max_step:
+        if self.gp_len < 0.4 or pr[0] >= 50 or self._get_param('/step_count') >= self.max_step:
             done = True
         else:
             done = False
@@ -127,12 +127,6 @@ class GazeboJackalNavigationEnv(gym.Env):
             action_bin = [int(s) for s in bin(action).replace('0b', '')]
             action_bin = [0]*(len(self.param_list)-len(action_bin)) + action_bin
             assert len(action_bin) == len(self.param_list)
-
-            try: # for the case when running in the container, it doesn't call self.reset()
-                self.step_count += 1
-            except:
-                self.step_count = 0
-
             i = 0
             for a, d, pn in zip(action_bin, self.param_delta, self.param_list):
                 param = self.navi_stack.get_navi_param(pn)
@@ -144,6 +138,9 @@ class GazeboJackalNavigationEnv(gym.Env):
                 self.navi_stack.set_navi_param(pn, param)
         else: # the last action is pass without doing anything
             pass
+
+        step_count = self._get_param('/step_count')
+        self._set_param('/step_count', step_count+1)
 
         # Unpause the world
         self.gazebo_sim.unpause()
@@ -162,7 +159,7 @@ class GazeboJackalNavigationEnv(gym.Env):
 
     def reset(self):
 
-        self.step_count = 0
+        self._set_param('/step_count', 0)
         # reset robot in odom frame clear_costmap
         self.navi_stack.reset_robot_in_odom()
         # Resets the state of the environment and returns an initial observation.
