@@ -5,3 +5,8 @@ register(
     id='jackal_navigation-v0',
     entry_point='jackal_envs.envs:GazeboJackalNavigationEnv',
 )
+
+register(
+    id='jackal_navigation_parallel-v0',
+    entry_point='jackal_envs.envs:ParallelGazeboJackalNavigationEnv',
+)
