@@ -5,3 +5,6 @@
 __pycache__/*
 
 sftp-config.json
+
+results/*
+

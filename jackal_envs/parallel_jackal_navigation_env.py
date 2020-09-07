@@ -1,23 +1,26 @@
 import gym
 import docker
-from os.path import dirname, basename
-import numpy
+from os.path import dirname, basename, abspath
+import numpy as np
 import re
 from gym import utils, spaces
+gym.logger.set_level(40)
 
 class ParallelGazeboJackalNavigationEnv(gym.Env):
 
     def __init__(self, config_path):
+        config_path = abspath(config_path)
         self.dirname = dirname(config_path)
         self.basename = basename(config_path)
-        client = docker.from_env()
+        self.client = docker.from_env()
         container = self.client.containers.run('zifanxu/ros-jackal', detach = True, tty=True,
-                                                volumes={dirname:{'bind': '/home/configs/', 'mode': 'rw'}})
-        out = container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
-                                python3 /home/jackal_envs/contrainer_script/init.py \
-                                --config /home/configs/%s'" %(self.basename))
+                                                volumes={self.dirname:{'bind': '/home/configs/', 'mode': 'rw'}})
+        _, out = container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
+                                    python3 /home/jackal_envs/contrainer_script/init.py \
+                                    --config /home/configs/%s'" %(self.basename))
         self.container = container
-
+        # print(out)
+        out = out.decode('utf-8')
         state_shape = re.search("\[state_shape:(.*)\]", out).group(1)
         state_shape = int(state_shape)
 
@@ -31,25 +34,26 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
         self.reward_range = (-np.inf, np.inf)
 
     def reset(self):
-        out = self.container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
+        _, out = self.container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
                                     python3 /home/jackal_envs/contrainer_script/reset.py \
                                     --config /home/configs/%s'" %(self.basename))
-        out = out.replace('\n', '')
+        out = out.decode('utf-8').replace('\n', '')
         obs = re.search("Observation:\[(.*)\]", out).group(1)
         obs = obs.split(' ')
         obs = [float(s) for s in obs if s]
         return np.array(obs)
 
     def step(self, action):
-        out = self.container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
+        _, out = self.container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
                                     python3 /home/jackal_envs/contrainer_script/step.py \
                                     --config /home/configs/%s \
                                     --action %d'" %(self.basename, action))
-        out = out.replace('\n', '')
+        out = out.decode('utf-8').replace('\n', '')
         # pharse observation
         obs = re.search("\[Observation\]\[(.*)\]\[Reward\]", out).group(1)
         obs = obs.split(' ')
         obs = [float(s) for s in obs if s]
+        obs = np.array(obs)
         # pharse reward
         rew = re.search("\[Reward\](.*)\[Done\]", out).group(1)
         rew = float(rew)
@@ -60,7 +64,7 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
         params = re.search("\[Information\]\[(.*)\]", out).group(1)
         params = params.split(', ')
         params = [float(s) for s in params if s]
-        info = {'params': parmas}
+        info = {'params': params}
 
         return obs, rew, done, info
 
