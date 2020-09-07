@@ -16,3 +16,9 @@ wrapper_config = config['wrapper_config']
 
 wrapper_dict = jackal_envs.jackal_sim_wrapper.wrapper_dict
 env = wrapper_dict[wrapper_config['wrapper']](gym.make('jackal_navigation-v0', **env_config), wrapper_config['wrapper_args'])
+
+state_shape = env.observation_space.shape or env.observation_space.n
+action_shape = env.action_space.shape or env.action_space.n
+
+print('[state_shape:%d]' %(state_shape))
+print('[action_shape:%d]' %(action_shape))

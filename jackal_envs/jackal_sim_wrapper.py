@@ -1,6 +1,7 @@
 import gym
 import numpy as np
 import matplotlib.pyplot as plt
+gym.logger.set_level(40)
 
 args = {
     "start_range": [[-1.5, -0.5], [-1.5, 1.5]],
@@ -63,7 +64,7 @@ class ReducedObservation(gym.Wrapper):
         self.reward_shaping = True if args['reward_shaping'] == 'true' else False
         self.observation_space = gym.spaces.Box(low=np.array([0.2]*(74)), # a hard coding here
                                             high=np.array([100]*(74)),
-                                            dtype=np.float)
+                                            dtype=np.float32)
 
     def obs_reduction(self, obs):
         a = obs[:-3][::self.reduction]
