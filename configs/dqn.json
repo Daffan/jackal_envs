@@ -19,7 +19,7 @@
     "wrapper": "reward_shaping",
     "wrapper_args": {
       "start_range": [[-1.5, -0.5], [-1.5, 1.5]],
-      "goal_range": [[0.5, 1.5], [-1.5, 1.5]],
+      "goal_range": [[0.5, 1.5],  [-1.5, 1.5]],
       "seed": 43,
 
       "reduction": 10,
@@ -32,7 +32,7 @@
     }
   },
   "training_config": {
-    "num_envs": 2,
+    "num_envs": 4,
     "learning_rate": 0.001,
     "layer_num": 3,
     "hidden_layer_size": 128,

@@ -9,7 +9,7 @@ import jackal_envs
 # env = RandomStartGoalPosition(gym.make('jackal_navigation-v0', world_name = '85cm_split.world', gui = 'true', VLP16 = 'false'))
 # env = RewardShaping(gym.make('jackal_navigation-v0', world_name = 'sequential_applr_testbed.world', gui = 'true', VLP16 = 'false', init_position = [-8, 0, 0], goal_position = [54, 0, 0]))
 env = gym.make('jackal_navigation_parallel-v0', config_path = 'configs/dqn.json')
-
+env.reset()
 done = False
 count = 0
 while not done:

@@ -44,16 +44,6 @@ env_config = config['env_config']
 wrapper_config = config['wrapper_config']
 training_config = config['training_config']
 
-# Config logging
-now = datetime.now()
-dt_string = now.strftime("%Y_%m_%d_%H_%M")
-save_path = os.path.join(save_path, config['section'] + "_" + dt_string)
-if not os.path.exists(save_path):
-    os.mkdir(save_path)
-writer = SummaryWriter(save_path)
-with open(os.path.join(save_path, 'config.json'), 'w') as fp:
-    json.dump(config, fp)
-
 # initialize the env --> num_env can only be one right now
 if not config['use_container']:
     env = wrapper_dict[wrapper_config['wrapper']](gym.make('jackal_navigation-v0', **env_config), wrapper_config['wrapper_args'])
@@ -87,16 +77,10 @@ else:
     buf = ReplayBuffer(training_config['buffer_size'])
 policy.set_eps(1)
 train_collector = Collector(policy, train_envs, buf)
-train_collector.collect(n_step=1)
 
-train_fn =lambda e: [policy.set_eps(max(0.05, 1-e/training_config['epoch']/training_config['exploration_ratio'])),
-                    torch.save(policy.state_dict(), os.path.join(save_path, 'policy_%d.pth' %(e)))]
+t1 = time.time()
+train_collector.collect(n_step=1000)
+t2 = time.time()
 
-result = offpolicy_trainer(
-        policy, train_collector, training_config['epoch'],
-        training_config['step_per_epoch'], training_config['collect_per_step'],
-        training_config['batch_size'], update_per_step=training_config['update_per_step'],
-        train_fn=train_fn, writer=writer)
+print('run 1000 step with %d envs using time %f' %(training_config['num_envs'], t2-t1))
 
-for env in envs:
-    env.close()

@@ -23,7 +23,6 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
             print(out)
             return
         out = out.decode('utf-8')
-        print(out)
         state_shape = re.search("\[state_shape:(.*)\]", out).group(1)
         state_shape = int(state_shape)
 
@@ -35,6 +34,9 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
                                             high=np.array([1]*state_shape),
                                             dtype=np.float32)
         self.reward_range = (-np.inf, np.inf)
+
+    def seed(self, seed):
+        np.random.seed(seed)
 
     def reset(self):
         exit_code, out = self.container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \

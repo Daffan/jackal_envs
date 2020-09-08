@@ -59,17 +59,20 @@ with open(os.path.join(save_path, 'config.json'), 'w') as fp:
 if not config['use_container']:
     env = wrapper_dict[wrapper_config['wrapper']](gym.make('jackal_navigation-v0', **env_config), wrapper_config['wrapper_args'])
     train_envs = DummyVectorEnv([lambda: env for _ in range(1)])
+    state_shape = env.observation_space.shape or env.observation_space.n
+    action_shape = env.action_space.shape or env.action_space.n
 else:
-    envs = [gym.make('jackal_navigation_parallel-v0', config_path=config_path) for _ in range(training_config['num_envs'])]
-    train_envs = DummyVectorEnv([lambda: envs[i] for i in range(training_config['num_envs'])])
+    env = gym.make('jackal_navigation_parallel-v0', config_path=config_path)
+    state_shape = env.observation_space.shape or env.observation_space.n
+    action_shape = env.action_space.shape or env.action_space.n
+    env.close()
+    train_envs = DummyVectorEnv([lambda: gym.make('jackal_navigation_parallel-v0', config_path=config_path) \
+                                for _ in range(training_config['num_envs'])])
 
 # config random seed
 np.random.seed(config['seed'])
 torch.manual_seed(config['seed'])
 train_envs.seed(config['seed'])
-
-state_shape = envs[0].observation_space.shape or envs[0].observation_space.n
-action_shape = envs[0].action_space.shape or envs[0].action_space.n
 
 net = Net(training_config['layer_num'], state_shape, device=config['device']).to(config['device'])
 actor = Actor(net, action_shape).to(config['device'])
