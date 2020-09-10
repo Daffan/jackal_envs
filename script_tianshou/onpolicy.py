@@ -18,7 +18,7 @@ def onpolicy_trainer(
         repeat_per_collect: int,
         batch_size: int,
         train_fn: Optional[Callable[[int], None]] = None,
-        log_interval: int = 1,
+        log_interval: int = 200,
         verbose: bool = True,
         test_in_train: bool = True,
         writer: Optional[SummaryWriter] = None,

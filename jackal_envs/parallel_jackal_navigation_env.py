@@ -19,9 +19,7 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
                                     python3 /home/jackal_envs/contrainer_script/init.py \
                                     --config /home/configs/%s'" %(self.basename))
         self.container = container
-        if exit_code != 0:
-            print(out)
-            return
+        assert exit_code == 0, out.decode('utf-8')
         out = out.decode('utf-8')
         state_shape = re.search("\[state_shape:(.*)\]", out).group(1)
         state_shape = int(state_shape)
@@ -42,10 +40,8 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
         exit_code, out = self.container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
                                     python3 /home/jackal_envs/contrainer_script/reset.py \
                                     --config /home/configs/%s'" %(self.basename))
+        assert exit_code == 0, out.decode('utf-8')
         out = out.decode('utf-8').replace('\n', '')
-        if exit_code != 0:
-            print(out)
-            return
         obs = re.search("Observation:\[(.*)\]", out).group(1)
         obs = obs.split(' ')
         obs = [float(s) for s in obs if s]
@@ -56,10 +52,8 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
                                     python3 /home/jackal_envs/contrainer_script/step.py \
                                     --config /home/configs/%s \
                                     --action %d'" %(self.basename, action))
+        assert exit_code == 0, out.decode('utf-8')
         out = out.decode('utf-8').replace('\n', '')
-        if exit_code != 0:
-            print(out)
-            return
         # pharse observation
         obs = re.search("\[Observation\]\[(.*)\]\[Reward\]", out).group(1)
         obs = obs.split(' ')

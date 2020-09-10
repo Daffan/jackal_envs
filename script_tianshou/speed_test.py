@@ -77,10 +77,11 @@ else:
     buf = ReplayBuffer(training_config['buffer_size'])
 policy.set_eps(1)
 train_collector = Collector(policy, train_envs, buf)
-
+import time
 t1 = time.time()
 train_collector.collect(n_step=1000)
 t2 = time.time()
 
+train_envs.close()
 print('run 1000 step with %d envs using time %f' %(training_config['num_envs'], t2-t1))
 

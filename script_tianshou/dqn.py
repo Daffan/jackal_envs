@@ -11,7 +11,7 @@ except:
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from tianshou.env import DummyVectorEnv
+from tianshou.env import SubprocVectorEnv, DummyVectorEnv
 from tianshou.policy import DQNPolicy
 from tianshou.utils.net.common import Net
 from tianshou.data import Collector, ReplayBuffer, PrioritizedReplayBuffer
@@ -65,7 +65,7 @@ else:
     state_shape = env.observation_space.shape or env.observation_space.n
     action_shape = env.action_space.shape or env.action_space.n
     env.close()
-    train_envs = DummyVectorEnv([lambda: gym.make('jackal_navigation_parallel-v0', config_path=config_path) \
+    train_envs = SubprocVectorEnv([lambda: gym.make('jackal_navigation_parallel-v0', config_path=config_path) \
                                 for _ in range(training_config['num_envs'])])
 
 # config random seed
@@ -98,5 +98,4 @@ result = offpolicy_trainer(
         training_config['batch_size'], update_per_step=training_config['update_per_step'],
         train_fn=train_fn, writer=writer)
 
-for env in envs:
-    env.close()
+train_envs.close()

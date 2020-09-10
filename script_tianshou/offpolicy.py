@@ -19,7 +19,7 @@ def offpolicy_trainer(
         update_per_step: int = 1,
         train_fn: Optional[Callable[[int], None]] = None,
         writer: Optional[SummaryWriter] = None,
-        log_interval: int = 200,
+        log_interval: int = 1000,
 ) -> int:
     """A wrapper for off-policy trainer procedure. The ``step`` in trainer
     means a policy network update.
