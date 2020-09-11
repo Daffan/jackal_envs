@@ -14,10 +14,10 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
         self.basename = basename(config_path)
         self.client = docker.from_env()
         container = self.client.containers.run('zifanxu/ros-jackal', detach = True, tty=True,
-                                                volumes={self.dirname:{'bind': '/home/configs/', 'mode': 'rw'}})
+                                                volumes={self.dirname:{'bind': '/home/mnt/', 'mode': 'rw'}})
         exit_code, out = container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
                                     python3 /home/jackal_envs/contrainer_script/init.py \
-                                    --config /home/configs/%s'" %(self.basename))
+                                    --config /home/mnt/%s'" %(self.basename))
         self.container = container
         assert exit_code == 0, out.decode('utf-8')
         out = out.decode('utf-8')
@@ -38,19 +38,21 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
 
     def reset(self):
         exit_code, out = self.container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
-                                    python3 /home/jackal_envs/contrainer_script/reset.py \
-                                    --config /home/configs/%s'" %(self.basename))
+                                    python3 /home/mnt/contrainer_script/reset.py \
+                                    --config /home/mnt/%s'" %(self.basename))
         assert exit_code == 0, out.decode('utf-8')
         out = out.decode('utf-8').replace('\n', '')
         obs = re.search("Observation:\[(.*)\]", out).group(1)
         obs = obs.split(' ')
         obs = [float(s) for s in obs if s]
+
+        self.xl = [] # list of x coordinate
         return np.array(obs)
 
     def step(self, action):
         exit_code, out = self.container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
-                                    python3 /home/jackal_envs/contrainer_script/step.py \
-                                    --config /home/configs/%s \
+                                    python3 /home/mnt/contrainer_script/step.py \
+                                    --config /home/mnt/%s \
                                     --action %d'" %(self.basename, action))
         assert exit_code == 0, out.decode('utf-8')
         out = out.decode('utf-8').replace('\n', '')
@@ -63,13 +65,25 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
         rew = re.search("\[Reward\](.*)\[Done\]", out).group(1)
         rew = float(rew)
         # pharse done
-        done = re.search("\[Done\](.*)\[Information\]", out).group(1)
+        done = re.search("\[Done\](.*)\[Params\]", out).group(1)
         done = True if done == 'True' else False
         # pharse info
-        params = re.search("\[Information\]\[(.*)\]", out).group(1)
+        params = re.search("\[Params\]\[(.*)\]", out).group(1)
         params = params.split(', ')
         params = [float(s) for s in params if s]
-        info = {'params': params}
+        X = re.search("\[X\](.*)\[Y\]", out).group(1)
+        X = float(X)
+        Y = re.search("\[Y\](.*)\[Over\]", out).group(1)
+        Y = float(X)
+
+        info = {'params': params, 'X': X, 'Y':Y}
+
+        # To decide stuck condition
+        self.xl.append(X)
+        if len(xl) > 100:
+            if xl[-1] <= xl[-100]:
+                rew = -300
+                done = True
 
         return obs, rew, done, info
 
