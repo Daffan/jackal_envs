@@ -17,7 +17,7 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
         container = self.client.containers.run('zifanxu/ros-jackal', detach = True, tty=True,
                                                 volumes={self.dirname:{'bind': '/home/mnt/', 'mode': 'rw'}})
         exit_code, out = container.exec_run("/bin/bash -c 'source /home/jackal_ws/devel/setup.bash; \
-                                    python3 /home/jackal_envs/contrainer_script/init.py \
+                                    python3 /home/mnt/contrainer_script/init.py \
                                     --config /home/mnt/%s'" %(self.basename))
         self.container = container
         assert exit_code == 0, out.decode('utf-8')

@@ -136,12 +136,14 @@ class RewardShaping(gym.Wrapper):
         self.env._set_param('/X', position.x)
         rew += self.env.navi_stack.punish_rewrad()*self.stuck_punishment
         rp = np.array(position.x)
-        self.rp.append(rp)
-
-        if len(self.rp) > 100:
-            if self.rp[-1] < self.rp[-100]:
-                done = True
-                rew = self.punishment_reward
+        try:
+            self.rp.append(rp)
+            if len(self.rp) > 100:
+                if self.rp[-1] < self.rp[-100]:
+                    done = True
+                    rew = self.punishment_reward
+        except:
+            pass
         if position.z > 0.1: # or
             done = True
             rew = self.punishment_reward
