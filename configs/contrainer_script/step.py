@@ -18,8 +18,6 @@ wrapper_config = config['wrapper_config']
 wrapper_dict = jackal_envs.jackal_sim_wrapper.wrapper_dict
 env = wrapper_dict[wrapper_config['wrapper']](gym.make('jackal_navigation-v0', **env_config), wrapper_config['wrapper_args'])
 msg = env.env.gazebo_sim.get_model_state()
-X = msg.pose.position.x
-Y = msg.pose.position.y
 obs, rew, done, info = env.step(args.action)
 print('[Observation]')
 print(obs)
@@ -30,7 +28,7 @@ print(done)
 print('[Params]')
 print(info['params'])
 print('[X]')
-print(X)
+print(info['X'])
 print('[Y]')
-print(Y)
+print(info['Y'])
 print('[Over]')

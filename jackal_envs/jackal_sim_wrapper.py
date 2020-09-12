@@ -118,7 +118,7 @@ class RewardShaping(gym.Wrapper):
 
     def reset(self):
         obs = self.env.reset()
-        self.env._set_param('/X', self.env.gazebo_sim.get_model_state().x)
+        self.env._set_param('/X', self.env.gazebo_sim.get_model_state().pose.position.x)
         self.rp = []
         return obs
 
@@ -132,23 +132,23 @@ class RewardShaping(gym.Wrapper):
         obs, rew, done, info = self.env.step(action)
         # reward is the decrease of the distance
         position = self.env.gazebo_sim.get_model_state().pose.position
-        rew += (position.x - self.env._get_param('/X')) * goal_distance_reward
+        rew += (position.x - self.env._get_param('/X')) * self.goal_distance_reward
         self.env._set_param('/X', position.x)
         rew += self.env.navi_stack.punish_rewrad()*self.stuck_punishment
-        rp = np.array([position.x, position.y])
+        rp = np.array(position.x)
         self.rp.append(rp)
 
         if len(self.rp) > 100:
             if self.rp[-1] < self.rp[-100]:
                 done = True
-                rew = -self.punishment_reward
+                rew = self.punishment_reward
         if position.z > 0.1: # or
             done = True
-            rew = -self.punishment_reward
+            rew = self.punishment_reward
         if position.x > 42: # or
             done = True
-
-
+        info['X'] = position.x
+        info['Y'] = position.y
 
         return obs, rew, done, info
 
