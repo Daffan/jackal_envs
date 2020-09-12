@@ -107,8 +107,9 @@ class RewardShaping(gym.Wrapper):
             goal_range -- [[x_min, x_max], [y_min, y_max]]
         '''
         super(RewardShaping, self).__init__(env)
-        self.goal_distance_reward = True if args['goal_distance_reward'] == 'true' else False
+        self.goal_distance_reward = args['goal_distance_reward']
         self.stuck_punishment = args['stuck_punishment']
+        self.punishment_reward = args['punishment_reward']
         self.global_path = self.env.navi_stack.robot_config.global_path
         self.gp_len = sum([self.distance(self.global_path[i+1], self.global_path[i]) for i in range(len(self.global_path)-1)])
 
@@ -117,8 +118,8 @@ class RewardShaping(gym.Wrapper):
 
     def reset(self):
         obs = self.env.reset()
-        self.env._set_param('/pre_gp_len', self.env.gp_len)
-        # self.rp = []
+        self.env._set_param('/X', self.env.gazebo_sim.get_model_state().x)
+        self.rp = []
         return obs
 
     def visual_path(self):
@@ -130,23 +131,21 @@ class RewardShaping(gym.Wrapper):
         # take one step
         obs, rew, done, info = self.env.step(action)
         # reward is the decrease of the distance
-        if self.goal_distance_reward:
-            rew += (-self.env.gp_len + self.env._get_param('/pre_gp_len'))
-        self.env._set_param('/pre_gp_len', self.env.gp_len)
+        position = self.env.gazebo_sim.get_model_state().pose.position
+        rew += (position.x - self.env._get_param('/X')) * goal_distance_reward
+        self.env._set_param('/X', position.x)
         rew += self.env.navi_stack.punish_rewrad()*self.stuck_punishment
-        self.pre_gp_len = self.env.gp_len
-        msg = self.env.gazebo_sim.get_model_state()
-        # rp = np.array([msg.pose.position.x, msg.pose.position.y])
-        # self.rp.append(rp)
+        rp = np.array([position.x, position.y])
+        self.rp.append(rp)
 
-        # if len(self.rp) > 100:
-        #     if (np.sqrt(np.sum((self.rp[-1]-self.rp[-100])**2))) < 0.4:
-        #         done = True
-        #         rew = -300
-        if msg.pose.position.z > 0.1: # or
+        if len(self.rp) > 100:
+            if self.rp[-1] < self.rp[-100]:
+                done = True
+                rew = -self.punishment_reward
+        if position.z > 0.1: # or
             done = True
-            rew = -300
-        if msg.pose.position.x > 42: # or
+            rew = -self.punishment_reward
+        if position.x > 42: # or
             done = True
 
 

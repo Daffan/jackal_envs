@@ -108,7 +108,7 @@ class GazeboJackalNavigationEnv(gym.Env):
         gpl = np.array(self.goal_position[:2])
         self.gp_len = np.sqrt(np.sum((pr-gpl)**2))
 
-        if self.gp_len < 0.4 or pr[0] >= 50 or self._get_param('/step_count') >= self.max_step:
+        if self.gp_len < 0.4 or self._get_param('/step_count') >= self.max_step:
             done = True
         else:
             done = False

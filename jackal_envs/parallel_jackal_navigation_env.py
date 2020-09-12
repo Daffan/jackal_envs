@@ -8,7 +8,8 @@ gym.logger.set_level(40)
 
 class ParallelGazeboJackalNavigationEnv(gym.Env):
 
-    def __init__(self, config_path):
+    def __init__(self, config_path, collide = -600):
+        self.collide = collide
         config_path = abspath(config_path)
         self.dirname = dirname(config_path)
         self.basename = basename(config_path)
@@ -63,12 +64,12 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
         obs = np.array(obs)
         # pharse reward
         rew = re.search("\[Reward\](.*)\[Done\]", out).group(1)
-        rew = float(rew)
+        rew = float(rew) if float(rew) != -300 else self.collide
         # pharse done
         done = re.search("\[Done\](.*)\[Params\]", out).group(1)
         done = True if done == 'True' else False
         # pharse info
-        params = re.search("\[Params\]\[(.*)\]", out).group(1)
+        params = re.search("\[Params\]\[(.*)\]\[X\]", out).group(1)
         params = params.split(', ')
         params = [float(s) for s in params if s]
         X = re.search("\[X\](.*)\[Y\]", out).group(1)
@@ -80,9 +81,9 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
 
         # To decide stuck condition
         self.xl.append(X)
-        if len(xl) > 100:
-            if xl[-1] <= xl[-100]:
-                rew = -300
+        if len(self.xl) > 100:
+            if self.xl[-1] <= self.xl[-100]:
+                rew = self.collide
                 done = True
 
         return obs, rew, done, info

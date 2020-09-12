@@ -17,18 +17,20 @@ from tianshou.data import Collector, ReplayBuffer, PrioritizedReplayBuffer
 # env = gym.make('jackal_navigation_parallel-v0', config_path = 'configs/dqn.json')
 
 env = SubprocVectorEnv([lambda: gym.make('jackal_navigation_parallel-v0', config_path='configs/dqn.json') \
-                                for _ in range(12)])
-a = env.reset()
-print(a)
+                                for _ in range(1)])
+env.reset()
 done = False
 count = 0
 t1 = time.time()
-while count <= 100:
+ep_return = 0
+while not done:
     count += 1
-    obs_next, rew, done, info = env.step([64]*12)
-    print('current step %d' %(count))
-print(done)
-print('done!')
+    obs_next, rew, done, info = env.step([64]*1)
+    X = info[0]['X']
+    ep_return += rew
+    print('current step %d, rew %f, X %f' %(count, rew, X))
+    print(info[0]['params'])
+print('done! ep_return: %f' %(ep_return))
 t2 = time.time()
 print(t2-t1)
 env.close()
