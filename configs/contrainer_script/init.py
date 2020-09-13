@@ -22,3 +22,4 @@ action_shape = env.action_space.shape or env.action_space.n
 
 print('[state_shape:%d]' %(state_shape))
 print('[action_shape:%d]' %(action_shape))
+print('[punishment_reward:%d]' %(env.punishment_reward))

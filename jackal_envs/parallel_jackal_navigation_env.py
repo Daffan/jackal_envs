@@ -8,8 +8,7 @@ gym.logger.set_level(40)
 
 class ParallelGazeboJackalNavigationEnv(gym.Env):
 
-    def __init__(self, config_path, collide = -600):
-        self.collide = collide
+    def __init__(self, config_path):
         config_path = abspath(config_path)
         self.dirname = dirname(config_path)
         self.basename = basename(config_path)
@@ -27,6 +26,9 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
 
         action_shape = re.search("\[action_shape:(.*)\]", out).group(1)
         action_shape = int(action_shape)
+
+        punishment_reward = re.search("\[punishment_reward:(.*)\]", out).group(1)
+        self.punishment_reward = int(punishment_reward)
 
         self.action_space = spaces.Discrete(action_shape)
         self.observation_space = spaces.Box(low=np.array([-1]*state_shape), # a hard coding here
@@ -64,7 +66,7 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
         obs = np.array(obs)
         # pharse reward
         rew = re.search("\[Reward\](.*)\[Done\]", out).group(1)
-        rew = float(rew) if float(rew) != -300 else self.collide
+        rew = float(rew)
         # pharse done
         done = re.search("\[Done\](.*)\[Params\]", out).group(1)
         done = True if done == 'True' else False
@@ -83,7 +85,7 @@ class ParallelGazeboJackalNavigationEnv(gym.Env):
         self.xl.append(X)
         if len(self.xl) > 100:
             if self.xl[-1] <= self.xl[-100]:
-                rew = self.collide
+                rew = self.punishment_reward
                 done = True
 
         return obs, rew, done, info
