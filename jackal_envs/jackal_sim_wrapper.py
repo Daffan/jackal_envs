@@ -100,11 +100,13 @@ class ReducedObservation(gym.Wrapper):
 class RewardShaping(gym.Wrapper):
 
     def __init__(self, env, args = args):
-        '''A wrapper that will shape the reward by the length of the globle path
+        '''A wrapper that will shape the reward by the length of the globle path. The robot flip over or stuck at the same
+        place for 100 step will terminate and return a large negative reward.
         args:
             env -- GazeboJackalNavigationEnv
-            start_range -- [[x_min, x_max], [y_min, y_max]]
-            goal_range -- [[x_min, x_max], [y_min, y_max]]
+            arg['goal_distance_reward'] -- [float] coefficient of change of distance when added into reward
+            arg['stuck_punishment'] -- [float] coefficient of stuck_punishment reward
+            arg['punishment_reward'] -- [int] the large negative reward when flip over or stuck
         '''
         super(RewardShaping, self).__init__(env)
         self.goal_distance_reward = args['goal_distance_reward']
@@ -119,7 +121,7 @@ class RewardShaping(gym.Wrapper):
     def reset(self):
         obs = self.env.reset()
         self.env._set_param('/X', self.env.gazebo_sim.get_model_state().pose.position.x)
-        self.rp = []
+        self.rp = [] # sequence of robot X position
         return obs
 
     def visual_path(self):
@@ -138,6 +140,7 @@ class RewardShaping(gym.Wrapper):
         rp = np.array(position.x)
         try:
             self.rp.append(rp)
+            # When robot don't move forward for 100 steps, terminate and return large negative rew
             if len(self.rp) > 100:
                 if self.rp[-1] < self.rp[-100]:
                     done = True
